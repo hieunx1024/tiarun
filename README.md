@@ -28,15 +28,15 @@ A lightweight, high-performance desktop application and file launcher for Linux 
 
 | Application search | File and folder search |
 | --- | --- |
-| ![Searching for Firefox in Liquid Glass](assets/screenshots/app-search.png) | ![Searching for a sample project folder with @f](assets/screenshots/file-search.png) |
+| ![Searching for Firefox in Liquid Glass](https://cdn.jsdelivr.net/gh/hieunx1024/view-launcher@main/assets/screenshots/app-search.png) | ![Searching for a sample project folder with @f](https://cdn.jsdelivr.net/gh/hieunx1024/view-launcher@main/assets/screenshots/file-search.png) |
 
 | Calculator and unit conversion | Emoji picker |
 | --- | --- |
-| ![Converting 25 kilometers to miles](assets/screenshots/calculator.png) | ![Searching for heart emoji with @emoji](assets/screenshots/emoji-picker.png) |
+| ![Converting 25 kilometers to miles](https://cdn.jsdelivr.net/gh/hieunx1024/view-launcher@main/assets/screenshots/calculator.png) | ![Searching for heart emoji with @emoji](https://cdn.jsdelivr.net/gh/hieunx1024/view-launcher@main/assets/screenshots/emoji-picker.png) |
 
 ### Spotlight Preferences
 
-![Preferences for startup, appearance, and search](assets/screenshots/preferences.png)
+![Preferences for startup, appearance, and search](https://cdn.jsdelivr.net/gh/hieunx1024/view-launcher@main/assets/screenshots/preferences.png)
 
 ## Installation
 
