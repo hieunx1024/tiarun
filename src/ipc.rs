@@ -4,10 +4,10 @@ use std::path::PathBuf;
 #[cfg(unix)]
 pub fn get_socket_path() -> PathBuf {
     if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
-        PathBuf::from(runtime_dir).join("view-launcher.sock")
+        PathBuf::from(runtime_dir).join("tiarun.sock")
     } else {
         let user = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
-        PathBuf::from(format!("/tmp/view-launcher-{}.sock", user))
+        PathBuf::from(format!("/tmp/tiarun-{}.sock", user))
     }
 }
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-AUR_REPO="ssh://aur@aur.archlinux.org/view-launcher-git.git"
-CLONE_DIR="/tmp/view-launcher-git-aur"
+AUR_REPO="ssh://aur@aur.archlinux.org/tiarun-git.git"
+CLONE_DIR="/tmp/tiarun-git-aur"
 
 echo "=== AUR Deployment Helper ==="
 echo "Make sure you have registered your SSH key at https://aur.archlinux.org"

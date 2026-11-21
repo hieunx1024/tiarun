@@ -1,11 +1,13 @@
 import { Theme } from "theme.slint";
 import { LiquidGlassLauncher, LauncherItemData } from "launcher.slint";
+import { CategoryChip } from "components/chip.slint";
 
 export { Theme, LauncherItemData }
 
 export component AppWindow inherits Window {
-    title: "View Launcher";
-    icon: @image-url("../assets/view-launcher.png");
+    forward-focus: window_focus;
+    title: "TiaRun";
+    icon: @image-url("../assets/tiarun.png");
     no-frame: true;
     background: transparent;
     width: root.launcher_width;
@@ -14,11 +16,23 @@ export component AppWindow inherits Window {
     property <length> shadow_margin: root.cfg_enable_shadow_margin && root.cfg_view_style == "liquid_glass" && !root.in_settings_mode ? Theme.shadow_margin : 0px;
     property <length> content_height: root.in_settings_mode ? Theme.settings_height :
         (root.is_showing_list ? Theme.panel_height : Theme.pill_height);
-    out property <length> launcher_width: Theme.panel_width + 2 * root.shadow_margin;
+    property <length> panel_base_width: (root.is_showing_list && !root.in_settings_mode) ? Theme.panel_width : Theme.pill_width;
+    out property <length> launcher_width: root.panel_base_width + 2 * root.shadow_margin;
     out property <length> launcher_height: root.content_height + root.shadow_margin;
     out property <length> launcher_radius: root.is_showing_list ? Theme.panel_radius : Theme.pill_radius;
     default-font-family: "Noto Sans";
     default-font-size: 19px;
+
+    // File Preview Panel Properties
+    in-out property <bool> show_preview: false;
+    in property <string> preview_title: "";
+    in property <string> preview_type: "none"; // "image" | "text" | "metadata"
+    in property <string> preview_lang: "";
+    in property <string> preview_text: "";
+    in property <string> preview_file_size: "";
+    in property <string> preview_file_modified: "";
+    in property <string> preview_file_location: "";
+    in property <image> preview_image;
 
     in-out property <string> search_text: "";
     in-out property <int> selected_index: 0;
@@ -27,6 +41,7 @@ export component AppWindow inherits Window {
         glass_launcher.results_height : list_flickable.height;
     in-out property <string> active_category: "";
     in property <bool> categories_enabled: true;
+    in property <[string]> categories: ["Applications", "Development", "Browser", "Media", "Office", "System", "Actions"];
     in property <[LauncherItemData]> items: [];
     in property <bool> has_results: true;
     in property <string> mode_title: "APPLICATIONS";
@@ -44,7 +59,10 @@ export component AppWindow inherits Window {
     // together with the panel's drop-shadow proved to be too heavy for rapid
     // show/hide cycles and crashed the compositor.
     in-out property <bool> is_pop_visible: false;
-    in-out property <bool> is_showing_list: (!root.cfg_compact_empty || root.search_text != "" || root.in_settings_mode || root.is_expanded);
+    in-out property <bool> is_showing_list: root.in_settings_mode
+        || root.search_text != ""
+        || root.is_expanded
+        || (!root.cfg_compact_empty && root.cfg_view_style != "liquid_glass");
 
     // Action Vector Icons
     in property <image> settings_icon;
@@ -72,49 +90,62 @@ export component AppWindow inherits Window {
     in-out property <bool> has_blur: true;
     in-out property <bool> is_dark: false;
     in-out property <string> settings_status: "";
+    in-out property <string> active_scope: "apps";
+    in property <image> scope_apps_icon;
+    in property <image> scope_files_icon;
+    in property <image> scope_text_icon;
+    in property <image> scope_windows_icon;
+    in property <string> action_hint_text: "";
+    in property <string> action_item_count: "";
 
     // Dynamic Theme Color Tokens (Fuzzel Theme)
-    property <color> col_card_bg: rgba(28, 28, 28, root.cfg_theme_opacity);
-    property <color> col_border: #2d2d2d;
-    property <color> col_text_primary: #c2c0b6;
-    property <color> col_text_muted: #8e8e93;
-    property <color> col_text_placeholder: #636366;
-    property <color> col_input_text: #faf9f5;
-    property <color> col_selection_bg: #2d2d2d;
-    property <color> col_selection_text: #faf9f5;
-    property <color> col_prompt: #dedcd1;
-    property <color> col_item_hover: #2d2d2d80;
-    property <color> col_accent: #dedcd1;
-    property <color> col_item_selected_bg: #2d2d2d;
-    property <color> col_badge_bg: #2d2d2d;
-    property <color> col_badge_text: #dedcd1;
-    property <color> col_separator: #2d2d2d;
-    property <color> col_kbd_bg: #2d2d2d;
-    property <color> col_kbd_border: #38383a;
-    property <color> col_kbd_text: #8e8e93;
-    property <color> col_kbd_accent: #dedcd1;
-    property <color> col_settings_card_bg: #222222;
-    property <color> col_settings_card_border: #2d2d2d;
-    property <color> col_settings_card_text: #faf9f5;
-    property <color> col_btn_secondary_bg: #2d2d2d;
-    property <color> col_btn_secondary_hover: #383838;
-    property <color> col_btn_secondary_text: #faf9f5;
+    property <color> col_card_bg: root.is_dark ? rgba(28, 28, 28, root.cfg_theme_opacity) : rgba(250, 250, 252, root.cfg_theme_opacity);
+    property <color> col_border: root.is_dark ? #2d2d2d : #e5e5ea;
+    property <color> col_text_primary: root.is_dark ? #c2c0b6 : #1d1d1f;
+    property <color> col_text_muted: root.is_dark ? #8e8e93 : #86868b;
+    property <color> col_text_placeholder: root.is_dark ? #9ca3af : #4b5563;
+    property <color> col_input_text: root.is_dark ? #faf9f5 : #1d1d1f;
+    property <color> col_selection_bg: root.is_dark ? #2d2d2d : #e5e5ea;
+    property <color> col_selection_text: root.is_dark ? #faf9f5 : #1d1d1f;
+    property <color> col_prompt: root.is_dark ? #dedcd1 : #48484a;
+    property <color> col_item_hover: root.is_dark ? #2d2d2d80 : #f2f2f780;
+    property <color> col_accent: root.is_dark ? #dedcd1 : #007aff;
+    property <color> col_item_selected_bg: root.is_dark ? #2d2d2d : #e5e5ea;
+    property <color> col_badge_bg: root.is_dark ? #2d2d2d : #e5e5ea;
+    property <color> col_badge_text: root.is_dark ? #dedcd1 : #48484a;
+    property <color> col_separator: root.is_dark ? #2d2d2d : #e5e5ea;
+    property <color> col_kbd_bg: root.is_dark ? #2d2d2d : #f2f2f7;
+    property <color> col_kbd_border: root.is_dark ? #38383a : #d1d1d6;
+    property <color> col_kbd_text: root.is_dark ? #8e8e93 : #86868b;
+    property <color> col_kbd_accent: root.is_dark ? #dedcd1 : #007aff;
+    property <color> col_settings_card_bg: root.is_dark ? #222222 : #ffffff;
+    property <color> col_settings_card_border: root.is_dark ? #2d2d2d : #e5e5ea;
+    property <color> col_settings_card_text: root.is_dark ? #faf9f5 : #1d1d1f;
+    property <color> col_btn_secondary_bg: root.is_dark ? #2d2d2d : #f2f2f7;
+    property <color> col_btn_secondary_hover: root.is_dark ? #383838 : #e5e5ea;
+    property <color> col_btn_secondary_text: root.is_dark ? #faf9f5 : #1d1d1f;
 
     callback search_text_changed(string);
+    callback file_search_finished();
     callback move_up();
     callback move_down();
     callback item_activated(int);
     callback open_in_terminal(int);
     callback copy_path(int);
+    callback copy_item(int);
     callback open_config();
     callback close_settings();
     callback save_settings(bool, bool, bool, int, int, bool, bool, string, float, string);
     callback chip_selected(string);
+    callback scope_selected(string);
     callback open_raw_config();
     callback close_window();
     callback start_window_drag();
     callback tab_pressed();
+    callback backtab_pressed();
     callback handle_backspace() -> bool;
+    callback handle_right_arrow() -> bool;
+    callback handle_left_arrow() -> bool;
     callback request_system_theme();
     // "!" shell mode command recall (Up/Down), like a real shell's history.
     callback shell_history_prev() -> string;
@@ -186,10 +217,26 @@ export component AppWindow inherits Window {
         Theme.has_blur = root.has_blur;
     }
 
-    if root.shadow_margin > 0px: Rectangle {
+    window_focus := FocusScope {
+        width: 100%;
+        height: 100%;
+        key-pressed(event) => {
+            if (event.text == Key.Escape || event.text == "\u{001b}") {
+                if (root.in_settings_mode) {
+                    root.auto_save_settings();
+                    root.close_settings();
+                } else {
+                    root.close_window();
+                }
+                return accept;
+            }
+            return reject;
+        }
+
+        if root.shadow_margin > 0px: Rectangle {
         x: root.shadow_margin;
         y: 0px;
-        width: Theme.panel_width;
+        width: root.panel_base_width;
         height: root.content_height;
         border-radius: root.launcher_radius;
         opacity: root.is_pop_visible ? 1.0 : 0.0;
@@ -203,11 +250,11 @@ export component AppWindow inherits Window {
         visible: (root.cfg_view_style == "liquid_glass") && !root.in_settings_mode;
         x: root.shadow_margin;
         y: 0px;
-        width: Theme.panel_width;
+        width: root.panel_base_width;
         height: root.content_height;
-        border-radius: root.launcher_radius;
         active_category <=> root.active_category;
         categories_enabled: root.categories_enabled;
+        categories: root.categories;
         search_text <=> root.search_text;
         selected_index <=> root.selected_index;
         scroll_viewport_y <=> root.scroll_viewport_y;
@@ -217,6 +264,15 @@ export component AppWindow inherits Window {
         settings_icon: root.settings_icon;
         is_expanded: root.is_showing_list;
         is_pop_visible: root.is_pop_visible;
+        show_preview: root.show_preview;
+        preview_title: root.preview_title;
+        preview_type: root.preview_type;
+        preview_lang: root.preview_lang;
+        preview_text: root.preview_text;
+        preview_file_size: root.preview_file_size;
+        preview_file_modified: root.preview_file_modified;
+        preview_file_location: root.preview_file_location;
+        preview_image: root.preview_image;
 
         search_text_changed(txt) => {
             root.is_expanded = (txt != "");
@@ -234,6 +290,15 @@ export component AppWindow inherits Window {
         tab_pressed() => {
             root.tab_pressed();
         }
+        backtab_pressed() => {
+            root.backtab_pressed();
+        }
+        right_arrow_pressed => {
+            return root.handle_right_arrow();
+        }
+        left_arrow_pressed => {
+            return root.handle_left_arrow();
+        }
         backspace_pressed => {
             return root.handle_backspace();
         }
@@ -249,6 +314,26 @@ export component AppWindow inherits Window {
         chip_selected(cat) => {
             root.is_expanded = true;
             root.chip_selected(cat);
+        }
+        active_scope <=> root.active_scope;
+        scope_apps_icon: root.scope_apps_icon;
+        scope_files_icon: root.scope_files_icon;
+        scope_text_icon: root.scope_text_icon;
+        scope_windows_icon: root.scope_windows_icon;
+        action_hint_text: root.action_hint_text;
+        action_item_count: root.action_item_count;
+        cfg_show_status_bar: root.cfg_show_status_bar;
+        scope_selected(sc) => {
+            root.scope_selected(sc);
+        }
+        f1_pressed => {
+            root.set_search_text_and_search("?");
+        }
+        copy_item(idx) => {
+            root.copy_item(idx);
+        }
+        copy_path(idx) => {
+            root.copy_path(idx);
         }
     }
 
@@ -307,6 +392,7 @@ export component AppWindow inherits Window {
                         width: 18px;
                         Image {
                             source: root.search_icon;
+                            colorize: root.col_prompt;
                             width: 18px;
                             height: 18px;
                             image-fit: contain;
@@ -324,10 +410,23 @@ export component AppWindow inherits Window {
                         vertical-alignment: center;
                     }
 
-                    // 1.3 Text Input (Clean cursor, no placeholder)
+                    // 1.3 Text Input
                     Rectangle {
                         horizontal-stretch: 1;
                         clip: true;
+
+                        if (root.search_text == "") : Text {
+                            x: 0px;
+                            y: 0px;
+                            width: 100%;
+                            height: 100%;
+                            text: "Search";
+                            font-size: 16px;
+                            font-weight: 400;
+                            color: root.col_text_placeholder;
+                            vertical-alignment: center;
+                            horizontal-alignment: left;
+                        }
 
                         search_input := TextInput {
                             x: 0px;
@@ -360,17 +459,30 @@ export component AppWindow inherits Window {
                                     root.move_cursor_to_end();
                                     return accept;
                                 }
+                                if (event.text == Key.Backtab) {
+                                    root.backtab_pressed();
+                                    root.move_cursor_to_end();
+                                    return accept;
+                                }
+                                if (event.text == Key.RightArrow) {
+                                    if (root.handle_right_arrow()) {
+                                        root.move_cursor_to_end();
+                                        return accept;
+                                    }
+                                }
+                                if (event.text == Key.LeftArrow) {
+                                    if (root.handle_left_arrow()) {
+                                        root.move_cursor_to_end();
+                                        return accept;
+                                    }
+                                }
                                 if (event.text == Key.Backspace) {
                                     if (root.handle_backspace()) {
                                         root.move_cursor_to_end();
                                         return accept;
                                     }
                                 }
-                                if (event.text == Key.Escape) {
-                                    if (root.cfg_compact_empty && root.search_text == "" && root.is_expanded) {
-                                        root.is_expanded = false;
-                                        return accept;
-                                    }
+                                if (event.text == Key.Escape || event.text == "\u{001b}") {
                                     root.close_window();
                                     return accept;
                                 }
@@ -412,9 +524,19 @@ export component AppWindow inherits Window {
                                     root.open_in_terminal(root.selected_index);
                                     return accept;
                                 }
+                                if (event.modifiers.control && event.modifiers.shift && (event.text == "c" || event.text == "C")) {
+                                    root.copy_path(root.selected_index);
+                                    return accept;
+                                }
                                 if (event.modifiers.alt && (event.text == "c" || event.text == "C")) {
                                     root.copy_path(root.selected_index);
                                     return accept;
+                                }
+                                if (event.modifiers.control && (event.text == "c" || event.text == "C")) {
+                                    if (self.cursor-position_byte-offset == self.anchor-position-byte-offset) {
+                                        root.copy_item(root.selected_index);
+                                        return accept;
+                                    }
                                 }
                                 return reject;
                             }
@@ -450,7 +572,7 @@ export component AppWindow inherits Window {
                             width: 28px;
                             height: 28px;
                             border-radius: 6px;
-                            background: settings_touch.has-hover ? #2d2d2d : transparent;
+                            background: settings_touch.has-hover ? root.col_selection_bg : transparent;
                             animate background { duration: 100ms; }
 
                             settings_touch := TouchArea {
@@ -463,6 +585,7 @@ export component AppWindow inherits Window {
                                 x: (parent.width - self.width) / 2;
                                 y: (parent.height - self.height) / 2;
                                 source: root.settings_icon;
+                                colorize: root.col_prompt;
                                 width: 16px;
                                 height: 16px;
                                 image-fit: contain;
@@ -474,126 +597,389 @@ export component AppWindow inherits Window {
                 }
             }
 
+            // Scope Filter Chips in Classic Mode
+            if (root.is_showing_list && !root.in_settings_mode) : Rectangle {
+                height: Theme.chips_height;
+                HorizontalLayout {
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    alignment: start;
+                    spacing: 8px;
+
+                    CategoryChip {
+                        icon: root.scope_apps_icon;
+                        has_icon: true;
+                        text: "Apps";
+                        active: root.active_scope == "apps";
+                        clicked => { root.scope_selected("apps"); }
+                    }
+                    CategoryChip {
+                        icon: root.scope_files_icon;
+                        has_icon: true;
+                        text: "Files";
+                        active: root.active_scope == "files";
+                        clicked => { root.scope_selected("files"); }
+                    }
+                    CategoryChip {
+                        icon: root.scope_text_icon;
+                        has_icon: true;
+                        text: "Text";
+                        active: root.active_scope == "text";
+                        clicked => { root.scope_selected("text"); }
+                    }
+                    CategoryChip {
+                        icon: root.scope_windows_icon;
+                        has_icon: true;
+                        text: "Windows";
+                        active: root.active_scope == "windows";
+                        clicked => { root.scope_selected("windows"); }
+                    }
+                }
+            }
+
             // 2. SCROLLABLE RESULTS LIST (Fuzzel Item Selection Style)
             list_container := Rectangle {
                 visible: root.is_showing_list;
                 vertical-stretch: 1;
                 clip: true;
 
-                // 2.1 Empty State
-                Rectangle {
-                    visible: !root.has_results;
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 8px;
-                        HorizontalLayout {
+                HorizontalLayout {
+                    width: 100%;
+                    height: 100%;
+
+                    // 2.1 Empty State
+                    if (!root.has_results) : Rectangle {
+                        horizontal-stretch: 1;
+                        VerticalLayout {
                             alignment: center;
-                            Image {
-                                source: root.is_empty_folder ? root.folder_icon : root.search_icon;
-                                width: 32px;
-                                height: 32px;
-                                image-fit: contain;
+                            spacing: 8px;
+                            HorizontalLayout {
+                                alignment: center;
+                                Image {
+                                    source: root.is_empty_folder ? root.folder_icon : root.search_icon;
+                                    width: 32px;
+                                    height: 32px;
+                                    image-fit: contain;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            Text {
+                                text: root.empty_state_title;
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: root.col_text_primary;
                                 horizontal-alignment: center;
-                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: root.empty_state_subtitle;
+                                font-size: 12px;
+                                color: root.col_text_muted;
+                                horizontal-alignment: center;
                             }
                         }
-                        Text {
-                            text: root.empty_state_title;
-                            font-size: 14px;
-                            font-weight: 600;
-                            color: root.col_text_primary;
-                            horizontal-alignment: center;
-                        }
-                        Text {
-                            text: root.empty_state_subtitle;
-                            font-size: 12px;
-                            color: root.col_text_muted;
-                            horizontal-alignment: center;
+                    }
+
+                    // 2.2 Scrollable Results
+                    list_flickable := Flickable {
+                        visible: root.has_results;
+                        horizontal-stretch: 1;
+                        viewport-y <=> root.scroll_viewport_y;
+                        viewport-height: Math.max(self.height, root.items.length * 44px);
+
+                        VerticalLayout {
+                            spacing: 0px;
+                            alignment: start;
+
+                            for item[index] in root.items : item_row := Rectangle {
+                                height: 44px;
+                                background: (index == root.selected_index) ? root.col_selection_bg : (item_touch.has-hover ? root.col_item_hover : transparent);
+                                border-radius: 0px;
+                                animate background { duration: 60ms; }
+
+                                item_touch := TouchArea {
+                                    clicked => {
+                                        root.selected_index = index;
+                                        root.item_activated(index);
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 20px;
+                                    padding-right: 20px;
+                                    padding-top: 0px;
+                                    padding-bottom: 0px;
+                                    spacing: 14px;
+
+                                    // Perfectly Vertically-Centered 32px Icon Container
+                                    VerticalLayout {
+                                        alignment: center;
+                                        width: 32px;
+
+                                        HorizontalLayout {
+                                            alignment: center;
+
+                                            // Real system icon
+                                            if (root.cfg_show_icons && item.has_icon) : Image {
+                                                source: item.icon;
+                                                width: 32px;
+                                                height: 32px;
+                                                image-fit: contain;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+
+                                            // Fallback text/glyph icon
+                                            if (!root.cfg_show_icons || !item.has_icon) : Rectangle {
+                                                width: 30px;
+                                                height: 30px;
+                                                border-radius: 6px;
+                                                background: root.col_badge_bg;
+
+                                                Text {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text: (item.item_type == "calc") ? "=" : ((item.item_type == "dir") ? "/" : ((item.item_type == "clip") ? "≡" : ((item.item_type == "win") ? "□" : ((item.item_type == "sys") ? "⚙" : ((item.item_type == "theme") ? "◐" : ((item.item_type == "shell") ? "❯" : ((item.item_type == "web") ? "↗" : "◆")))))));
+                                                    color: root.col_badge_text;
+                                                    font-size: 15px;
+                                                    font-weight: 700;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Item Name Title (Fuzzel Noto Sans 19px) and Subtitle
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        alignment: center;
+                                        spacing: 1px;
+                                        Text {
+                                            text: item.name;
+                                            color: (index == root.selected_index) ? root.col_selection_text : root.col_text_primary;
+                                            font-weight: (index == root.selected_index) ? 600 : 500;
+                                            font-size: item.subtitle != "" ? 15px : 19px;
+                                            overflow: elide;
+                                            vertical-alignment: center;
+                                        }
+                                        if (item.subtitle != "") : Text {
+                                            text: item.subtitle;
+                                            color: (index == root.selected_index) ? root.col_selection_text : root.col_text_muted;
+                                            font-size: 11px;
+                                            overflow: elide;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                }
 
-                // 2.2 Scrollable Results
-                list_flickable := Flickable {
-                    visible: root.has_results;
-                    viewport-y <=> root.scroll_viewport_y;
-                    viewport-height: Math.max(self.height, root.items.length * 44px);
+                    // 2.3 Divider between results and preview
+                    if (root.show_preview && root.has_results) : Rectangle {
+                        width: 1px;
+                        background: root.col_border;
+                    }
 
-                    VerticalLayout {
-                        spacing: 0px;
-                        alignment: start;
+                    // 2.4 Preview Panel (Classic / Fuzzel Theme)
+                    if (root.show_preview && root.has_results) : Rectangle {
+                        width: Theme.preview_pane_width;
+                        background: root.col_card_bg;
+                        clip: true;
 
-                        for item[index] in root.items : item_row := Rectangle {
-                            height: 44px;
-                            background: (index == root.selected_index) ? root.col_selection_bg : (item_touch.has-hover ? root.col_item_hover : transparent);
-                            border-radius: 0px;
-                            animate background { duration: 60ms; }
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 8px;
 
-                            item_touch := TouchArea {
-                                clicked => {
-                                    root.selected_index = index;
-                                    root.item_activated(index);
+                            // Preview Title
+                            Text {
+                                text: root.preview_title;
+                                font-size: 16px;
+                                font-weight: 700;
+                                color: root.col_text_primary;
+                                overflow: elide;
+                            }
+
+                            if (root.preview_file_location != "") : Text {
+                                text: root.preview_file_location;
+                                font-size: 12px;
+                                color: root.col_text_muted;
+                                overflow: elide;
+                            }
+
+                            Rectangle {
+                                height: 1px;
+                                background: root.col_border;
+                            }
+
+                            // 1. Image Preview
+                            if (root.preview_type == "image") : Rectangle {
+                                vertical-stretch: 1;
+                                background: rgba(0, 0, 0, 0.2);
+                                border-radius: 6px;
+                                border-width: 1px;
+                                border-color: root.col_border;
+                                clip: true;
+                                VerticalLayout {
+                                    alignment: center;
+                                    padding: 8px;
+                                    Image {
+                                        source: root.preview_image;
+                                        max-width: 500px;
+                                        max-height: 380px;
+                                        image-fit: contain;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
                                 }
                             }
 
-                            HorizontalLayout {
-                                padding-left: 20px;
-                                padding-right: 20px;
-                                padding-top: 0px;
-                                padding-bottom: 0px;
-                                spacing: 14px;
+                            // 2. Text Snippet Preview
+                            if (root.preview_type == "text") : Rectangle {
+                                vertical-stretch: 1;
+                                background: rgba(0, 0, 0, 0.25);
+                                border-radius: 6px;
+                                border-width: 1px;
+                                border-color: root.col_border;
+                                clip: true;
 
-                                // Perfectly Vertically-Centered 32px Icon Container
                                 VerticalLayout {
-                                    alignment: center;
-                                    width: 32px;
+                                    padding: 12px;
+                                    spacing: 8px;
+                                    alignment: start;
 
-                                    HorizontalLayout {
-                                        alignment: center;
-
-                                        // Real system icon
-                                        if (root.cfg_show_icons && item.has_icon) : Image {
-                                            source: item.icon;
-                                            width: 32px;
-                                            height: 32px;
-                                            image-fit: contain;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
+                                    if (root.preview_lang != "") : HorizontalLayout {
+                                        alignment: end;
+                                        Rectangle {
+                                            background: rgba(255, 255, 255, 0.1);
+                                            border-radius: 4px;
+                                            HorizontalLayout {
+                                                padding-left: 8px;
+                                                padding-right: 8px;
+                                                padding-top: 3px;
+                                                padding-bottom: 3px;
+                                                Text {
+                                                    text: root.preview_lang;
+                                                    font-family: "monospace";
+                                                    font-size: 11px;
+                                                    font-weight: 700;
+                                                    color: root.col_prompt;
+                                                }
+                                            }
                                         }
+                                    }
 
-                                        // Fallback text/glyph icon
-                                        if (!root.cfg_show_icons || !item.has_icon) : Rectangle {
-                                            width: 30px;
-                                            height: 30px;
-                                            border-radius: 6px;
-                                            background: root.col_badge_bg;
+                                    Flickable {
+                                        vertical-stretch: 1;
+                                        interactive: true;
+                                        viewport-height: classic_preview_layout.preferred-height;
+
+                                        classic_preview_layout := VerticalLayout {
+                                            x: 0px;
+                                            y: 0px;
+                                            width: 100%;
+                                            alignment: start;
 
                                             Text {
-                                                width: 100%;
-                                                height: 100%;
-                                                text: (item.item_type == "calc") ? "=" : ((item.item_type == "dir") ? "/" : ((item.item_type == "clip") ? "≡" : ((item.item_type == "win") ? "□" : ((item.item_type == "sys") ? "⚙" : ((item.item_type == "theme") ? "◐" : ((item.item_type == "shell") ? "❯" : ((item.item_type == "web") ? "↗" : "◆")))))));
-                                                color: root.col_badge_text;
-                                                font-size: 15px;
-                                                font-weight: 700;
-                                                horizontal-alignment: center;
-                                                vertical-alignment: center;
+                                                text: root.preview_text;
+                                                font-family: "monospace";
+                                                font-size: 13.5px;
+                                                color: root.col_text_primary;
+                                                wrap: word-wrap;
+                                                horizontal-alignment: left;
                                             }
                                         }
                                     }
                                 }
+                            }
 
-                                // Item Name Title (Fuzzel Noto Sans 19px)
+                            // 3. Metadata Preview Card
+                            if (root.preview_type == "metadata") : Rectangle {
+                                vertical-stretch: 1;
+                                background: rgba(0, 0, 0, 0.15);
+                                border-radius: 6px;
+                                border-width: 1px;
+                                border-color: root.col_border;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 12px;
+                                    padding: 20px;
+
+                                    Text {
+                                        text: root.preview_lang != "" ? root.preview_lang : "FILE";
+                                        font-size: 18px;
+                                        font-weight: 700;
+                                        color: root.col_prompt;
+                                        horizontal-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.preview_file_size;
+                                        font-size: 13px;
+                                        color: root.col_text_muted;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 1px;
+                                background: root.col_border;
+                            }
+
+                            // Bottom info bar
+                            HorizontalLayout {
+                                alignment: space-between;
                                 Text {
-                                    text: item.name;
-                                    color: (index == root.selected_index) ? root.col_selection_text : root.col_text_primary;
-                                    font-weight: (index == root.selected_index) ? 600 : 500;
-                                    font-size: 19px;
-                                    horizontal-stretch: 1;
-                                    vertical-alignment: center;
-                                    overflow: elide;
+                                    text: root.preview_file_size;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: root.col_prompt;
+                                }
+                                Text {
+                                    text: root.preview_file_modified;
+                                    font-size: 12px;
+                                    color: root.col_text_muted;
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Action Footer Bar in Classic Mode
+            if (root.is_showing_list && root.cfg_show_status_bar && !root.in_settings_mode) : Rectangle {
+                height: 28px;
+                background: transparent;
+
+                Rectangle {
+                    x: 20px;
+                    y: 0px;
+                    width: parent.width - 40px;
+                    height: 1px;
+                    background: root.col_border;
+                }
+
+                HorizontalLayout {
+                    width: 100%;
+                    height: 100%;
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    alignment: space-between;
+
+                    Text {
+                        text: root.action_hint_text;
+                        font-size: 11px;
+                        color: root.col_text_muted;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.action_item_count;
+                        font-size: 11px;
+                        color: root.col_text_muted;
+                        vertical-alignment: center;
                     }
                 }
             }
@@ -612,7 +998,7 @@ export component AppWindow inherits Window {
                 height: 100%;
 
                 key-pressed(event) => {
-                    if (event.text == Key.Escape) {
+                    if (event.text == Key.Escape || event.text == "\u{001b}") {
                         root.auto_save_settings();
                         root.close_settings();
                         return accept;
@@ -652,6 +1038,7 @@ export component AppWindow inherits Window {
                                     width: 18px;
                                     Image {
                                         source: root.settings_icon;
+                                        colorize: root.col_prompt;
                                         width: 16px;
                                         height: 16px;
                                         image-fit: contain;
@@ -1393,5 +1780,6 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
     }
 }

@@ -11,5 +11,7 @@ pub mod launcher;
 pub mod clipboard;
 pub mod window_switcher;
 pub mod system_actions;
-pub mod emoji;
 pub mod plugins;
+pub mod file_watcher;
+pub mod content_search;
+pub mod file_preview;

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Ultra-fast, zero-dependency inline arithmetic expression evaluator for view-launcher.
+/// Ultra-fast, zero-dependency inline arithmetic expression evaluator for TiaRun.
 /// Supports +, -, *, /, %, ^, parentheses, floats, integers, hex (0x...), and bin (0b...).
 
 #[derive(Debug, PartialEq, Clone)]
@@ -542,10 +542,13 @@ pub fn evaluate_conversion(query: &str) -> Option<ConversionResult> {
 static DYNAMIC_RATES: RwLock<Option<HashMap<String, f64>>> = RwLock::new(None);
 
 fn get_rates_cache_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|mut p| {
-        p.push("view-launcher");
-        p.push("rates.json");
-        p
+    dirs::config_dir().map(|p| {
+        let tiarun_dir = p.join("tiarun");
+        let legacy_dir = p.join("view-launcher");
+        if !tiarun_dir.exists() && legacy_dir.exists() {
+            let _ = std::fs::rename(&legacy_dir, &tiarun_dir);
+        }
+        tiarun_dir.join("rates.json")
     })
 }
 

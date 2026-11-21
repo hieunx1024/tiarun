@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="emblemGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#A3F4FF"/>
+      <stop offset="30%" stop-color="#67E2FF"/>
+      <stop offset="100%" stop-color="#27B8F5"/>
+    </linearGradient>
+    <linearGradient id="squircleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181E2C"/>
+      <stop offset="100%" stop-color="#111520"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#squircleGrad)" stroke="#263147" stroke-width="4"/>
+  <!-- Subtle inner bevel ring -->
+  <rect x="36" y="36" width="440" height="440" rx="108" fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-opacity="0.15"/>
+
+  <!-- Main T Shape -->
+  <polygon points="
+    117,132
+    395,132
+    347,186
+    283,186
+    198,368
+    140,368
+    225,186
+    117,186
+  " fill="url(#emblemGrad)"/>
+
+  <!-- Lightning Wing Glyph -->
+  <polygon points="
+    322,215
+    397,215
+    335,281
+    360,285
+    248,380
+  " fill="url(#emblemGrad)"/>
+</svg>

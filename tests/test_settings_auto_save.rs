@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use view_launcher::AppWindow;
+use tiarun::AppWindow;
 
 #[test]
 fn test_settings_auto_save_triggers() {

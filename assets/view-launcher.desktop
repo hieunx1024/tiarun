@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=View Launcher
+Name=TiaRun
 GenericName=Application & File Launcher
-Comment=Minimalist, high-performance GUI desktop app & file launcher in Rust (<5ms)
-Exec=view-launcher
-Icon=view-launcher
+Comment=Think. Search. Run. - High-performance desktop launcher in Rust (<5ms)
+Exec=tiarun
+Icon=tiarun
 Terminal=false
 Categories=Utility;
-Keywords=launcher;search;fuzzy;app;file;calculator;gui;
-StartupNotify=true
-StartupWMClass=view-launcher
+Keywords=launcher;search;fuzzy;app;file;calculator;gui;tiarun;
+StartupNotify=false
+StartupWMClass=tiarun

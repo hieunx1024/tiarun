@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use slint::{ComponentHandle, Model};
-use view_launcher::config::Config;
-use view_launcher::icon_resolver::IconResolver;
-use view_launcher::launcher::LauncherEngine;
-use view_launcher::{AppWindow, LauncherItemData};
+use tiarun::config::Config;
+use tiarun::icon_resolver::IconResolver;
+use tiarun::launcher::LauncherEngine;
+use tiarun::{AppWindow, LauncherItemData};
 
 #[test]
 fn test_real_typing_simulation() {
@@ -21,7 +21,7 @@ fn test_real_typing_simulation() {
         }
     };
     let mut config = Config::default();
-    config.apps.custom.push(view_launcher::config::CustomAppConfig {
+    config.apps.custom.push(tiarun::config::CustomAppConfig {
         name: "IntelliJ IDEA".to_string(),
         exec: "idea".to_string(),
         description: Some("IDE".to_string()),
@@ -29,7 +29,7 @@ fn test_real_typing_simulation() {
         icon: None,
         category: Some("IDE".to_string()),
     });
-    config.apps.custom.push(view_launcher::config::CustomAppConfig {
+    config.apps.custom.push(tiarun::config::CustomAppConfig {
         name: "Firefox Browser".to_string(),
         exec: "firefox".to_string(),
         description: Some("Web Browser".to_string()),
@@ -71,6 +71,7 @@ fn test_real_typing_simulation() {
                         has_icon,
                         icon: icon_img,
                         exec_or_path: item.exec_or_path.clone().into(),
+                        subtitle: item.exec_or_path.clone().into(),
                     });
                     current_items.push(item);
                 }

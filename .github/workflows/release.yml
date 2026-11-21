@@ -43,28 +43,28 @@ jobs:
       - name: Package Linux tar.gz
         run: |
           mkdir -p target/release-linux
-          cp target/release/view-launcher target/release-linux/
+          cp target/release/tiarun target/release-linux/
           cp README.md LICENSE target/release-linux/ 2>/dev/null || true
-          tar -czvf target/view-launcher-linux-x86_64.tar.gz -C target/release-linux view-launcher
+          tar -czvf target/tiarun-linux-x86_64.tar.gz -C target/release-linux tiarun
 
       - name: Build Debian (.deb) package
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           mkdir -p target/deb-pkg/usr/bin target/deb-pkg/usr/share/applications target/deb-pkg/usr/share/pixmaps target/deb-pkg/usr/share/icons/hicolor/scalable/apps target/deb-pkg/DEBIAN
-          cp target/release/view-launcher target/deb-pkg/usr/bin/
-          chmod 755 target/deb-pkg/usr/bin/view-launcher
-          cp assets/view-launcher.desktop target/deb-pkg/usr/share/applications/
-          cp assets/view-launcher.png target/deb-pkg/usr/share/pixmaps/
-          cp assets/view-launcher.svg target/deb-pkg/usr/share/pixmaps/
-          cp assets/view-launcher.svg target/deb-pkg/usr/share/icons/hicolor/scalable/apps/
+          cp target/release/tiarun target/deb-pkg/usr/bin/
+          chmod 755 target/deb-pkg/usr/bin/tiarun
+          cp assets/tiarun.desktop target/deb-pkg/usr/share/applications/
+          cp assets/tiarun.png target/deb-pkg/usr/share/pixmaps/
+          cp assets/tiarun.svg target/deb-pkg/usr/share/pixmaps/
+          cp assets/tiarun.svg target/deb-pkg/usr/share/icons/hicolor/scalable/apps/
           cat << EOF > target/deb-pkg/DEBIAN/control
-          Package: view-launcher
+          Package: tiarun
           Version: ${VERSION}
           Section: utils
           Priority: optional
           Architecture: amd64
           Maintainer: Hieu Nguyen <hieunx@outlook.com>
-          Description: High-performance minimalist GUI desktop app & file launcher in Rust (<5ms)
+          Description: Think. Search. Run. - High-performance desktop launcher in Rust (<5ms)
           EOF
           cat << 'EOF' > target/deb-pkg/DEBIAN/postinst
           #!/bin/sh
@@ -78,13 +78,13 @@ jobs:
           exit 0
           EOF
           chmod 755 target/deb-pkg/DEBIAN/postinst
-          dpkg-deb --build target/deb-pkg "target/view-launcher_${VERSION}_amd64.deb"
+          dpkg-deb --build target/deb-pkg "target/tiarun_${VERSION}_amd64.deb"
 
       - name: Stage Linux release assets
         run: |
           mkdir -p target/dist-linux
-          cp target/view-launcher-linux-x86_64.tar.gz target/dist-linux/
-          cp target/view-launcher_*_amd64.deb target/dist-linux/
+          cp target/tiarun-linux-x86_64.tar.gz target/dist-linux/
+          cp target/tiarun_*_amd64.deb target/dist-linux/
 
       - name: Upload Linux Assets
         uses: actions/upload-artifact@v4
@@ -111,7 +111,7 @@ jobs:
       - name: Package Windows zip
         shell: pwsh
         run: |
-          Compress-Archive -Path target/release/view-launcher.exe, README.md -DestinationPath target/view-launcher-windows-x86_64.zip
+          Compress-Archive -Path target/release/tiarun.exe, README.md -DestinationPath target/tiarun-windows-x86_64.zip
 
       - name: Compile Inno Setup Installer
         run: |
@@ -121,8 +121,8 @@ jobs:
         shell: pwsh
         run: |
           mkdir -p target/dist-windows
-          cp target/view-launcher-windows-x86_64.zip target/dist-windows/
-          cp installer/windows/Output/view-launcher-setup.exe target/dist-windows/
+          cp target/tiarun-windows-x86_64.zip target/dist-windows/
+          cp installer/windows/Output/tiarun-setup.exe target/dist-windows/
 
       - name: Upload Windows Assets
         uses: actions/upload-artifact@v4

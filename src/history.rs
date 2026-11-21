@@ -32,7 +32,7 @@ pub struct HistoryManager {
 impl HistoryManager {
     /// An in-memory-only manager with no backing file (`save()` becomes a no-op since
     /// it already guards on `cache_path.is_some()`). Used by tests so they don't write
-    /// throwaway data into the real `~/.cache/view-launcher/history.toml`.
+    /// throwaway data into the real `~/.cache/tiarun/history.toml`.
     #[cfg(test)]
     pub fn in_memory() -> Self {
         Self { data: HistoryData::default(), cache_path: None }
@@ -61,18 +61,24 @@ impl HistoryManager {
     fn get_cache_path() -> Option<PathBuf> {
         #[cfg(target_os = "windows")]
         {
-            dirs::data_local_dir().map(|mut p| {
-                p.push("view-launcher");
-                p.push("history.toml");
-                p
+            dirs::data_local_dir().map(|p| {
+                let tiarun_dir = p.join("tiarun");
+                let legacy_dir = p.join("view-launcher");
+                if !tiarun_dir.exists() && legacy_dir.exists() {
+                    let _ = std::fs::rename(&legacy_dir, &tiarun_dir);
+                }
+                tiarun_dir.join("history.toml")
             })
         }
         #[cfg(not(target_os = "windows"))]
         {
-            dirs::cache_dir().map(|mut p| {
-                p.push("view-launcher");
-                p.push("history.toml");
-                p
+            dirs::cache_dir().map(|p| {
+                let tiarun_dir = p.join("tiarun");
+                let legacy_dir = p.join("view-launcher");
+                if !tiarun_dir.exists() && legacy_dir.exists() {
+                    let _ = std::fs::rename(&legacy_dir, &tiarun_dir);
+                }
+                tiarun_dir.join("history.toml")
             })
         }
     }

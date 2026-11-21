@@ -1,9 +1,9 @@
-; Inno Setup Script for View Launcher
-#define MyAppName "View Launcher"
-#define MyAppVersion "0.5.3"
+; Inno Setup Script for TiaRun
+#define MyAppName "TiaRun"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "Hieu Nguyen"
-#define MyAppURL "https://github.com/hieunx1024/view-launcher"
-#define MyAppExeName "view-launcher.exe"
+#define MyAppURL "https://github.com/hieunx1024/tiarun"
+#define MyAppExeName "tiarun.exe"
 
 [Setup]
 AppId={{D37F7D28-854B-4E38-9FE7-99E8B62B23F1}
@@ -13,13 +13,13 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\view-launcher
+DefaultDirName={autopf}\TiaRun
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=Output
-OutputBaseFilename=view-launcher-setup
-SetupIconFile=..\..\assets\view-launcher.ico
-UninstallDisplayIcon={app}\view-launcher.ico
+OutputBaseFilename=tiarun-setup
+SetupIconFile=..\..\assets\tiarun.ico
+UninstallDisplayIcon={app}\tiarun.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -37,33 +37,34 @@ Name: "startupicon"; Description: "Automatically start with Windows and register
 
 [Files]
 Source: "..\..\target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\assets\view-launcher.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\assets\view-launcher.png"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\assets\tiarun.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\assets\tiarun.png"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\view-launcher.ico"; WorkingDir: "{app}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\tiarun.ico"; WorkingDir: "{app}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 ; Desktop
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\view-launcher.ico"; WorkingDir: "{app}"; Tasks: desktopicon; HotKey: "Ctrl+Alt+Space"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\tiarun.ico"; WorkingDir: "{app}"; Tasks: desktopicon; HotKey: "Ctrl+Alt+Space"
 
 ; Startup
-Name: "{userstartup}\ViewLauncher"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\view-launcher.ico"; WorkingDir: "{app}"; Tasks: startupicon
+Name: "{userstartup}\TiaRun"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\tiarun.ico"; WorkingDir: "{app}"; Tasks: startupicon
 
 [Registry]
 ; Add install folder to User PATH
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch View Launcher now"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch TiaRun now"; Flags: postinstall nowait skipifsilent
 
 [Code]
 function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
 begin
+  Exec('taskkill.exe', '/F /IM tiarun.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/F /IM view-launcher.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Sleep(250);
   Result := True;
@@ -73,6 +74,7 @@ function InitializeUninstall(): Boolean;
 var
   ResultCode: Integer;
 begin
+  Exec('taskkill.exe', '/F /IM tiarun.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/F /IM view-launcher.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Sleep(250);
   Result := True;

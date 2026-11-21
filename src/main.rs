@@ -9,10 +9,10 @@ use std::rc::Rc;
 use std::cell::Cell;
 
 use slint::ComponentHandle;
-use view_launcher::config::Config;
-use view_launcher::icon_resolver::IconResolver;
-use view_launcher::launcher::{self, LauncherEngine, LauncherItem, open_config_file};
-use view_launcher::{AppWindow, LauncherItemData};
+use tiarun::config::Config;
+use tiarun::icon_resolver::IconResolver;
+use tiarun::launcher::{self, LauncherEngine, LauncherItem, open_config_file};
+use tiarun::{AppWindow, LauncherItemData};
 use i_slint_backend_winit::WinitWindowAccessor;
 
 use std::io::{Read, Write};
@@ -28,10 +28,10 @@ use std::net::{TcpListener, TcpStream, SocketAddr};
 #[cfg(unix)]
 fn get_socket_path() -> PathBuf {
     if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
-        PathBuf::from(runtime_dir).join("view-launcher.sock")
+        PathBuf::from(runtime_dir).join("tiarun.sock")
     } else {
         let user = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
-        PathBuf::from(format!("/tmp/view-launcher-{}.sock", user))
+        PathBuf::from(format!("/tmp/tiarun-{}.sock", user))
     }
 }
 
@@ -165,7 +165,7 @@ fn sway_ipc_query(socket: &str, request_type: u32) -> Option<serde_json::Value> 
 fn check_node_focused(val: &serde_json::Value) -> bool {
     if val.get("focused").and_then(|v| v.as_bool()).unwrap_or(false) {
         if let Some(app_id) = val.get("app_id").and_then(|v| v.as_str()) {
-            return app_id == "view-launcher";
+            return app_id == "tiarun" || app_id == "view-launcher";
         }
         return false;
     }
@@ -188,7 +188,7 @@ fn check_node_focused(val: &serde_json::Value) -> bool {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn sway_launcher_node(node: &serde_json::Value) -> Option<&serde_json::Value> {
-    if node["app_id"].as_str() == Some("view-launcher") {
+    if node["app_id"].as_str() == Some("tiarun") || node["app_id"].as_str() == Some("view-launcher") {
         return Some(node);
     }
     ["nodes", "floating_nodes"]
@@ -210,7 +210,7 @@ fn is_launcher_focused(ui: &AppWindow) -> bool {
                 let mut buf = [0u8; 1024];
                 if let Ok(n) = stream.read(&mut buf) {
                     if let Ok(s) = std::str::from_utf8(&buf[..n]) {
-                        return s.contains("\"class\": \"view-launcher\"");
+                        return s.contains("\"class\": \"tiarun\"") || s.contains("\"class\": \"view-launcher\"");
                     }
                 }
             }
@@ -251,8 +251,91 @@ fn send_sway_ipc_command(cmd: &str) {
     }
 }
 
+fn apply_skip_taskbar(winit_window: &i_slint_backend_winit::winit::window::Window) {
+    #[cfg(target_os = "windows")]
+    {
+        use i_slint_backend_winit::winit::platform::windows::WindowExtWindows;
+        winit_window.set_skip_taskbar(true);
+
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
+        };
+        use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        if let Ok(handle) = winit_window.window_handle() {
+            if let RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
+                let hwnd = win32_handle.hwnd.get() as windows_sys::Win32::Foundation::HWND;
+                unsafe {
+                    let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                    let new_ex_style = (ex_style | (WS_EX_TOOLWINDOW as isize)) & !(WS_EX_APPWINDOW as isize);
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex_style);
+                }
+            }
+        }
+    }
+
+    #[cfg(all(target_os = "linux", feature = "x11"))]
+    {
+        use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        if let Ok(handle) = winit_window.window_handle() {
+            let xid = match handle.as_raw() {
+                RawWindowHandle::Xlib(h) => Some(h.window as u32),
+                RawWindowHandle::Xcb(h) => Some(h.window.get()),
+                _ => None,
+            };
+            if let Some(xid) = xid {
+                if let Ok((conn, _)) = x11rb::connect(None) {
+                    use x11rb::connection::Connection;
+                    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, PropMode};
+                    use x11rb::wrapper::ConnectionExt as _;
+
+                    // 1. _NET_WM_WINDOW_TYPE -> _NET_WM_WINDOW_TYPE_UTILITY
+                    if let Ok(reply) = conn.intern_atom(false, b"_NET_WM_WINDOW_TYPE") {
+                        if let Ok(atom_type) = reply.reply() {
+                            if let Ok(dock_reply) = conn.intern_atom(false, b"_NET_WM_WINDOW_TYPE_UTILITY") {
+                                if let Ok(atom_dock) = dock_reply.reply() {
+                                    let _ = conn.change_property32(
+                                        PropMode::REPLACE,
+                                        xid,
+                                        atom_type.atom,
+                                        AtomEnum::ATOM,
+                                        &[atom_dock.atom],
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. _NET_WM_STATE -> SKIP_TASKBAR, SKIP_PAGER, ABOVE
+                    if let Ok(state_reply) = conn.intern_atom(false, b"_NET_WM_STATE") {
+                        if let Ok(atom_state) = state_reply.reply() {
+                            let above = conn.intern_atom(false, b"_NET_WM_STATE_ABOVE").ok().and_then(|r| r.reply().ok()).map(|r| r.atom);
+                            let skip_tb = conn.intern_atom(false, b"_NET_WM_STATE_SKIP_TASKBAR").ok().and_then(|r| r.reply().ok()).map(|r| r.atom);
+                            let skip_pg = conn.intern_atom(false, b"_NET_WM_STATE_SKIP_PAGER").ok().and_then(|r| r.reply().ok()).map(|r| r.atom);
+                            let mut states = Vec::new();
+                            if let Some(a) = above { states.push(a); }
+                            if let Some(s) = skip_tb { states.push(s); }
+                            if let Some(p) = skip_pg { states.push(p); }
+                            if !states.is_empty() {
+                                let _ = conn.change_property32(
+                                    PropMode::REPLACE,
+                                    xid,
+                                    atom_state.atom,
+                                    AtomEnum::ATOM,
+                                    &states,
+                                );
+                            }
+                        }
+                    }
+                    let _ = conn.flush();
+                }
+            }
+        }
+    }
+}
+
 fn focus_launcher_window(ui: &AppWindow) {
     ui.window().with_winit_window(|w| {
+        apply_skip_taskbar(w);
         #[cfg(target_os = "windows")]
         {
             use windows_sys::Win32::UI::WindowsAndMessaging::{BringWindowToTop, SetForegroundWindow};
@@ -276,36 +359,191 @@ fn focus_launcher_window(ui: &AppWindow) {
             let sock_path = PathBuf::from(runtime_dir).join("hypr").join(sig).join(".socket.sock");
             if let Ok(mut stream) = UnixStream::connect(&sock_path) {
                 let _ = stream.set_write_timeout(Some(Duration::from_millis(50)));
-                let _ = stream.write_all(b"dispatch focuswindow title:^View Launcher$");
+                let _ = stream.write_all(b"dispatch focuswindow title:^TiaRun$");
             }
         }
-        send_sway_ipc_command("[app_id=\"view-launcher\"] focus");
+        send_sway_ipc_command("[app_id=\"tiarun\"] focus");
     }
 }
 
+static LAST_WINDOW_SIZE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn resize_window_for_state(ui: &AppWindow) {
-    let width = ui.get_launcher_width();
-    let height = ui.get_launcher_height();
+    let width = ui.get_launcher_width() as i32;
+    let height = ui.get_launcher_height() as i32;
+
+    let packed = ((width as u64) << 32) | (height as u32 as u64);
+    if LAST_WINDOW_SIZE.swap(packed, std::sync::atomic::Ordering::SeqCst) == packed {
+        return;
+    }
 
     #[cfg(all(unix, not(target_os = "macos")))]
     if ui.window().is_visible() {
-        if let Some(()) = resize_sway_launcher(width as i32, height as i32) {
+        if let Some(()) = resize_sway_launcher(width, height) {
             return;
         }
     }
 
-    ui.window().set_size(slint::LogicalSize::new(width, height));
+    ui.window().set_size(slint::LogicalSize::new(width as f32, height as f32));
     ui.window().with_winit_window(move |winit_window| {
-        let _ = winit_window.request_inner_size(i_slint_backend_winit::winit::dpi::LogicalSize::new(width, height));
+        let _ = winit_window.request_inner_size(i_slint_backend_winit::winit::dpi::LogicalSize::new(width as f32, height as f32));
     });
 
     #[cfg(target_os = "windows")]
-    apply_windows_rounded_corners(ui);
+    {
+        apply_windows_rounded_corners(ui);
+        reposition_and_anchor_window(ui);
+    }
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        send_sway_ipc_command(&format!("[title=\"^View Launcher$\"] resize set {} px {} px", width as i32, height as i32));
+        if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+            let _ = resize_hyprland_launcher(width, height);
+        } else if std::env::var_os("SWAYSOCK").is_none() {
+            reposition_and_anchor_window(ui);
+        }
     }
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn query_hyprland_ipc(cmd: &str) -> Option<String> {
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").ok()?;
+    let sig = std::env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
+    let sock_path = PathBuf::from(runtime_dir).join("hypr").join(sig).join(".socket.sock");
+    let mut stream = UnixStream::connect(&sock_path).ok()?;
+    stream.set_write_timeout(Some(Duration::from_millis(40))).ok()?;
+    stream.set_read_timeout(Some(Duration::from_millis(40))).ok()?;
+    stream.write_all(cmd.as_bytes()).ok()?;
+    let _ = stream.shutdown(std::net::Shutdown::Write);
+    let mut resp = String::new();
+    stream.read_to_string(&mut resp).ok()?;
+    Some(resp)
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn send_hyprland_ipc_command(cmd: &str) {
+    let _ = query_hyprland_ipc(cmd);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn get_hyprland_focused_monitor() -> Option<(i64, i64, i64, i64)> {
+    let json_str = query_hyprland_ipc("j/monitors")?;
+    let val: serde_json::Value = serde_json::from_str(&json_str).ok()?;
+    let monitors = val.as_array()?;
+    let mon = monitors.iter().find(|m| m["focused"].as_bool() == Some(true))
+        .or_else(|| monitors.first())?;
+
+    let mon_x = mon["x"].as_i64()?;
+    let mon_y = mon["y"].as_i64()?;
+    let scale = mon["scale"].as_f64().unwrap_or(1.0);
+    let scale = if scale <= 0.0 { 1.0 } else { scale };
+    let raw_w = mon["width"].as_f64()?;
+    let raw_h = mon["height"].as_f64()?;
+    let mon_w = (raw_w / scale).round() as i64;
+    let mon_h = (raw_h / scale).round() as i64;
+    Some((mon_x, mon_y, mon_w, mon_h))
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn place_hyprland_launcher(ui: &AppWindow) -> Option<()> {
+    if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_none() {
+        return None;
+    }
+    let (mon_x, mon_y, mon_w, mon_h) = get_hyprland_focused_monitor()?;
+    let width = ui.get_launcher_width() as i64;
+    let x = mon_x + (mon_w - width).max(0) / 2;
+    let y = mon_y + mon_h * 15 / 100;
+
+    send_hyprland_ipc_command(&format!(
+        "dispatch movewindowpixel exact {} {},title:^(TiaRun|View Launcher)$",
+        x, y
+    ));
+    Some(())
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn resize_hyprland_launcher(width: i32, _height: i32) -> Option<()> {
+    if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_none() {
+        return None;
+    }
+    let (mon_x, mon_y, mon_w, mon_h) = get_hyprland_focused_monitor()?;
+    let x = mon_x + (mon_w - (width as i64)).max(0) / 2;
+    let y = mon_y + mon_h * 15 / 100;
+
+    send_hyprland_ipc_command(&format!(
+        "dispatch movewindowpixel exact {} {},title:^(TiaRun|View Launcher)$",
+        x, y
+    ));
+    slint::Timer::single_shot(Duration::from_millis(15), move || {
+        send_hyprland_ipc_command(&format!(
+            "dispatch movewindowpixel exact {} {},title:^(TiaRun|View Launcher)$",
+            x, y
+        ));
+    });
+    Some(())
+}
+
+fn reposition_and_anchor_window(ui: &AppWindow) {
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if std::env::var_os("SWAYSOCK").is_some() {
+            let _ = launcher_is_placed_on_sway(ui);
+            return;
+        }
+        if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+            let _ = place_hyprland_launcher(ui);
+            return;
+        }
+    }
+
+    ui.window().with_winit_window(|winit_window| {
+        let monitor_opt = winit_window
+            .current_monitor()
+            .or_else(|| winit_window.primary_monitor())
+            .or_else(|| winit_window.available_monitors().next());
+
+        if let Some(monitor) = monitor_opt {
+            let screen_size = monitor.size();
+            let scale_factor = monitor.scale_factor();
+            let monitor_pos = monitor.position();
+            let window_width = (f64::from(ui.get_launcher_width()) * scale_factor) as i32;
+            let window_height = (f64::from(ui.get_launcher_height()) * scale_factor) as i32;
+            #[allow(unused_variables)]
+            let _ = window_height;
+
+            let pos_x = monitor_pos.x + (screen_size.width as i32 - window_width).max(0) / 2;
+            let pos_y = monitor_pos.y + (screen_size.height as f64 * 0.15) as i32;
+
+            #[cfg(target_os = "windows")]
+            {
+                use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+                use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                use windows_sys::Win32::Foundation::HWND;
+
+                if let Ok(handle) = winit_window.window_handle() {
+                    if let RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
+                        let hwnd = win32_handle.hwnd.get() as HWND;
+                        unsafe {
+                            SetWindowPos(
+                                hwnd,
+                                std::ptr::null_mut(),
+                                pos_x,
+                                pos_y,
+                                window_width,
+                                window_height,
+                                SWP_NOZORDER | SWP_NOACTIVATE,
+                            );
+                        }
+                    }
+                }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                winit_window.set_outer_position(i_slint_backend_winit::winit::dpi::PhysicalPosition::new(pos_x, pos_y));
+            }
+        }
+    });
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -315,18 +553,17 @@ fn resize_sway_launcher(width: i32, height: i32) -> Option<()> {
     let node = sway_launcher_node(&tree)?;
     let id = node["id"].as_i64()?;
     let rect = &node["rect"];
-    let x = rect["x"].as_i64()?;
-    let y = rect["y"].as_i64()?;
-    let geometry = &node["geometry"];
-    if geometry["width"].as_i64() != Some(i64::from(width))
-        || geometry["height"].as_i64() != Some(i64::from(height))
-    {
-        // Sway resizes floating windows around their center. Restore the top-left
-        // in the same IPC command so the search field stays where the user typed.
-        send_sway_ipc_command(&format!(
-            "[con_id={id}] resize set {width} px {height} px, move absolute position {x} px {y} px",
-        ));
+    let height_delta = i64::from(height) - rect["height"].as_i64()?;
+
+    // Resize the bottom edge first so a compositor minimum height cannot
+    // shift the top edge when applying the width.
+    let mut command = format!("[con_id={id}] ");
+    if height_delta != 0 {
+        let direction = if height_delta > 0 { "grow" } else { "shrink" };
+        command.push_str(&format!("resize {direction} down {} px, ", height_delta.abs()));
     }
+    command.push_str(&format!("resize set width {width} px"));
+    send_sway_ipc_command(&command);
     Some(())
 }
 
@@ -340,18 +577,33 @@ fn launcher_is_placed_on_sway(ui: &AppWindow) -> Option<bool> {
     let node = sway_launcher_node(&tree)?;
     let id = node["id"].as_i64()?;
     let workspaces = sway_ipc_query(&socket, 1)?;
-    let workspace = workspaces.as_array()?.iter().find(|ws| ws["focused"].as_bool() == Some(true))?;
+    let workspace = workspaces
+        .as_array()?
+        .iter()
+        .find(|ws| ws["focused"].as_bool() == Some(true))
+        .or_else(|| workspaces.as_array()?.first())?;
     let workspace_rect = &workspace["rect"];
     let width = workspace_rect["width"].as_i64()?;
     let height = workspace_rect["height"].as_i64()?;
-    let x = workspace_rect["x"].as_i64()?
-        + (width - i64::from(ui.get_launcher_width() as i32)).max(0) / 2;
-    let y = workspace_rect["y"].as_i64()? + height * 15 / 100;
+    let ws_x = workspace_rect["x"].as_i64()?;
+    let ws_y = workspace_rect["y"].as_i64()?;
+    let launcher_w = ui.get_launcher_width() as i32;
+    let launcher_h = ui.get_launcher_height() as i32;
+    let target_x = ws_x + (width - i64::from(launcher_w)).max(0) / 2;
+    let target_y = ws_y + height * 15 / 100;
     let rect = &node["rect"];
-    let positioned = rect["x"].as_i64() == Some(x) && rect["y"].as_i64() == Some(y);
+    let current_x = rect["x"].as_i64()?;
+    let current_y = rect["y"].as_i64()?;
+    let current_w = rect["width"].as_i64()?;
+    let current_h = rect["height"].as_i64()?;
+
+    let positioned = current_x == target_x
+        && current_y == target_y
+        && current_w == i64::from(launcher_w)
+        && current_h == i64::from(launcher_h);
     if !positioned {
         send_sway_ipc_command(&format!(
-            "[con_id={id}] floating enable, move absolute position {x} px {y} px, focus",
+            "[con_id={id}] floating enable, resize set {launcher_w} px {launcher_h} px, move absolute position {target_x} px {target_y} px, focus",
         ));
     }
     Some(positioned)
@@ -361,19 +613,28 @@ fn show_and_focus_launcher(
     ui: &AppWindow,
     ui_weak: slint::Weak<AppWindow>,
     shown_instant: &Arc<std::sync::RwLock<Instant>>,
+    query: &str,
 ) {
     let was_visible = ui.window().is_visible();
+    if !was_visible {
+        LAST_WINDOW_SIZE.store(0, std::sync::atomic::Ordering::SeqCst);
+    }
     let cfg = Config::load();
     ui.set_is_dark(cfg.theme.is_dark());
-    ui.set_cfg_compact_empty(cfg.theme.compact_empty_view.unwrap_or(false));
+    ui.set_cfg_compact_empty(cfg.theme.compact_empty_view.unwrap_or(true));
     ui.set_cfg_view_style(cfg.theme.view_style.clone().into());
-    ui.set_search_text("".into());
+    ui.set_search_text(query.into());
     ui.set_active_category("".into());
-    ui.set_is_expanded(false);
+    ui.set_active_scope("apps".into());
+    ui.set_is_expanded(!query.is_empty());
+    ui.set_show_preview(false);
     ui.set_selected_index(0);
     ui.set_scroll_viewport_y(0.0);
     resize_window_for_state(ui);
-    ui.invoke_search_text_changed("".into());
+    if !was_visible {
+        reposition_and_anchor_window(ui);
+    }
+    ui.invoke_search_text_changed(query.into());
     if let Ok(mut lock) = shown_instant.write() {
         *lock = Instant::now();
     }
@@ -383,12 +644,14 @@ fn show_and_focus_launcher(
     let _ = ui.show();
     focus_launcher_window(ui);
     ui.invoke_focus_search();
-    let ui_w = ui_weak.clone();
-    slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
-        if let Some(ui) = ui_w.upgrade() {
-            ui.invoke_focus_search();
-        }
-    });
+    if !was_visible {
+        slint::Timer::single_shot(Duration::from_millis(30), move || {
+            if let Some(ui) = ui_weak.upgrade().filter(|ui| ui.window().is_visible()) {
+                reposition_and_anchor_window(&ui);
+                ui.invoke_focus_search();
+            }
+        });
+    }
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -403,7 +666,7 @@ fn start_hyprland_focus_watcher(ui_handle: slint::Weak<AppWindow>, shown_instant
                     let Ok(line) = line else { break; };
                     if line.starts_with("activewindow>>") {
                         let active = line.trim_start_matches("activewindow>>");
-                        if !active.starts_with("view-launcher,") {
+                        if !active.starts_with("tiarun,") && !active.starts_with("view-launcher,") {
                             let ui_weak = ui_handle.clone();
                             let shown = shown_instant.clone();
                             let _ = slint::invoke_from_event_loop(move || {
@@ -452,17 +715,48 @@ fn start_daemon_listener(
                         break;
                     }
 
+                    if cmd.starts_with("escape") || cmd.starts_with("close") {
+                        let ui_weak = ui_handle.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_weak.upgrade() {
+                                ui.invoke_close_window();
+                            }
+                        });
+                        continue;
+                    }
+
+                    if cmd.starts_with("ping") {
+                        continue;
+                    }
+
+                    if cmd.starts_with("settings") {
+                        let ui_weak = ui_handle.clone();
+                        let shown = shown_instant.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_weak.upgrade() {
+                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
+                                let cfg = Config::load();
+                                ui.set_cfg_autostart(tiarun::config::is_autostart_enabled());
+                                ui.set_cfg_theme_mode(cfg.theme.mode.clone().into());
+                                ui.set_cfg_theme_opacity(cfg.theme.opacity);
+                                ui.set_is_dark(cfg.theme.is_dark());
+                                ui.set_in_settings_mode(true);
+                                ui.set_settings_status("".into());
+                                resize_window_for_state(&ui);
+                                ui.invoke_focus_settings();
+                            }
+                        });
+                        continue;
+                    }
+
                     if let Some(query) = cmd.strip_prefix("query:") {
                         let query_str = query.trim().to_string();
                         let ui_weak = ui_handle.clone();
                         let shown = shown_instant.clone();
                         let _ = slint::invoke_from_event_loop(move || {
                             if let Some(ui) = ui_weak.upgrade() {
-                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown);
-                                ui.set_search_text(query_str.clone().into());
-                                ui.set_is_expanded(!query_str.is_empty());
-                                resize_window_for_state(&ui);
-                                ui.invoke_search_text_changed(query_str.into());
+                                ui.set_in_settings_mode(false);
+                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown, &query_str);
                             }
                         });
                         continue;
@@ -479,7 +773,7 @@ fn start_daemon_listener(
                                 exit_flag.store(true, Ordering::SeqCst);
                                 let _ = ui.hide();
                             } else {
-                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown);
+                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
                             }
                         }
                     });
@@ -537,7 +831,7 @@ fn start_windows_global_hotkey(
                             exit_flag.store(true, Ordering::SeqCst);
                             let _ = ui.hide();
                         } else {
-                            show_and_focus_launcher(&ui, ui_weak.clone(), &shown);
+                            show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
                         }
                     }
                 });
@@ -573,6 +867,40 @@ fn start_daemon_listener(
                         break;
                     }
 
+                    if cmd.starts_with("escape") || cmd.starts_with("close") {
+                        let ui_weak = ui_handle.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_weak.upgrade() {
+                                ui.invoke_close_window();
+                            }
+                        });
+                        continue;
+                    }
+
+                    if cmd.starts_with("ping") {
+                        continue;
+                    }
+
+                    if cmd.starts_with("settings") {
+                        let ui_weak = ui_handle.clone();
+                        let shown = shown_instant.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_weak.upgrade() {
+                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
+                                let cfg = Config::load();
+                                ui.set_cfg_autostart(tiarun::config::is_autostart_enabled());
+                                ui.set_cfg_theme_mode(cfg.theme.mode.clone().into());
+                                ui.set_cfg_theme_opacity(cfg.theme.opacity);
+                                ui.set_is_dark(cfg.theme.is_dark());
+                                ui.set_in_settings_mode(true);
+                                ui.set_settings_status("".into());
+                                resize_window_for_state(&ui);
+                                ui.invoke_focus_settings();
+                            }
+                        });
+                        continue;
+                    }
+
                     let ui_weak = ui_handle.clone();
                     let exit_flag = exit_trigger.clone();
                     let shown = shown_instant.clone();
@@ -584,7 +912,7 @@ fn start_daemon_listener(
                                 exit_flag.store(true, Ordering::SeqCst);
                                 let _ = ui.hide();
                             } else {
-                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown);
+                                show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
                             }
                         }
                     });
@@ -594,37 +922,154 @@ fn start_daemon_listener(
     }
 }
 
+fn update_action_hints(
+    ui: &AppWindow,
+    selected_item: Option<&launcher::LauncherItem>,
+    total_count: usize,
+    selected_idx: usize,
+) {
+    let hint = if let Some(item) = selected_item {
+        match item.item_type {
+            launcher::ItemType::App => "↵ Open  •  Ctrl+C Copy  •  Alt+T Terminal",
+            launcher::ItemType::File => "↵ Open  •  Ctrl+C Copy  •  Alt+C Copy Path  •  Alt+T Terminal",
+            launcher::ItemType::Dir => "↵ Open  •  → Browse  •  Ctrl+C Copy  •  Alt+C Copy Path",
+            launcher::ItemType::Window => "↵ Focus Window  •  Esc Close",
+            launcher::ItemType::Clipboard => "↵ Paste  •  Esc Close",
+            launcher::ItemType::Calc => "↵ Copy to Clipboard",
+            launcher::ItemType::Shell => "↵ Run in Terminal",
+            launcher::ItemType::System => "↵ Execute Action",
+            launcher::ItemType::Theme => "↵ Apply Theme",
+            launcher::ItemType::WebSearch => "↵ Search Web  •  Esc Close",
+            launcher::ItemType::Dmenu => "↵ Select  •  Esc Close",
+        }
+    } else {
+        "↵ Open  •  Tab Scope  •  F1 Help"
+    };
+    ui.set_action_hint_text(hint.into());
+
+    let count_str = if total_count > 0 {
+        format!("{}/{}  •  Tab Scope", (selected_idx + 1).min(total_count), total_count)
+    } else {
+        "Tab Scope".to_string()
+    };
+    ui.set_action_item_count(count_str.into());
+}
+
+fn effective_search_query(ui: &AppWindow, engine: &LauncherEngine, query: &str) -> String {
+    let trimmed = query.trim();
+
+    // Two-way synchronization between search text prefix and active scope chip
+    let mut active_scope = ui.get_active_scope().to_string();
+    if active_scope.is_empty() {
+        active_scope = "apps".to_string();
+        ui.set_active_scope("apps".into());
+    }
+    if (trimmed.starts_with("@f") && !trimmed.starts_with("@fc")) || trimmed.starts_with("@file") {
+        active_scope = "files".to_string();
+        ui.set_active_scope("files".into());
+    } else if trimmed.starts_with("@content")
+        || trimmed.starts_with("@text")
+        || trimmed.starts_with("@grep")
+        || trimmed.starts_with("@fc")
+        || trimmed.starts_with("@t")
+    {
+        active_scope = "text".to_string();
+        ui.set_active_scope("text".into());
+    } else if trimmed.starts_with("@w") || trimmed.starts_with("@win") {
+        active_scope = "windows".to_string();
+        ui.set_active_scope("windows".into());
+    }
+
+    // When the user has not typed an explicit '@', '!', ':' prefix, route search based on active scope
+    if trimmed.is_empty() {
+        match active_scope.as_str() {
+            "files" => "@f".to_string(),
+            "windows" => "@w".to_string(),
+            "text" => "@t".to_string(),
+            _ => "".to_string(),
+        }
+    } else if !trimmed.starts_with(['@', '!', ':'])
+        && trimmed != "?"
+        && engine.resolve_path_search(trimmed).is_none()
+    {
+        match active_scope.as_str() {
+            "files" => format!("@f {}", trimmed),
+            "text" => format!("@t {}", trimmed),
+            "windows" => format!("@w {}", trimmed),
+            _ => query.to_string(),
+        }
+    } else {
+        query.to_string()
+    }
+}
+
 fn populate_items(
     ui: &AppWindow,
     engine: &LauncherEngine,
     icon_resolver: &IconResolver,
     query: &str,
 ) -> Vec<LauncherItem> {
+    let effective_query = effective_search_query(ui, engine, query);
+    render_search_results(ui, engine, icon_resolver, query, &effective_query, None)
+}
+
+struct FileSearchResults {
+    matches: Vec<(LauncherItem, Vec<usize>)>,
+    file_sizes: std::collections::HashMap<String, String>,
+}
+
+fn file_size_label(path: &str) -> String {
+    std::fs::metadata(path)
+        .map(|metadata| launcher::format_file_size(metadata.len()))
+        .unwrap_or_else(|_| "File".to_string())
+}
+
+fn render_search_results(
+    ui: &AppWindow,
+    engine: &LauncherEngine,
+    icon_resolver: &IconResolver,
+    query: &str,
+    effective_query: &str,
+    results: Option<FileSearchResults>,
+) -> Vec<LauncherItem> {
     let trimmed = query.trim();
-    let is_file_mode = trimmed.starts_with("@f") || trimmed.starts_with("@file");
-    let is_win_mode = trimmed.starts_with("@w") || trimmed.starts_with("@win");
-    let is_clip_mode = trimmed.starts_with("@c") || trimmed.starts_with("@clip");
-    let is_sys_mode = trimmed.starts_with("@sys") || trimmed.starts_with("@power");
-    let is_theme_mode = trimmed.starts_with("@theme") || trimmed.starts_with("@mode") || trimmed.starts_with("@opacity");
-    let is_shell_mode = trimmed.starts_with('!');
-    let is_help_mode = trimmed == "?";
+    let effective_trimmed = effective_query.trim();
+
+    let is_content_mode = effective_trimmed.starts_with("@content")
+        || effective_trimmed.starts_with("@text")
+        || effective_trimmed.starts_with("@grep")
+        || effective_trimmed.starts_with("@fc")
+        || effective_trimmed.starts_with("@t");
+    let is_file_mode = (effective_trimmed.starts_with("@f") && !effective_trimmed.starts_with("@fc")) || effective_trimmed.starts_with("@file");
+    let is_win_mode = effective_trimmed.starts_with("@w") || effective_trimmed.starts_with("@win");
+    let is_clip_mode = effective_trimmed.starts_with("@c") || effective_trimmed.starts_with("@clip");
+    let is_sys_mode = effective_trimmed.starts_with("@sys") || effective_trimmed.starts_with("@power");
+    let is_theme_mode = effective_trimmed.starts_with("@theme") || effective_trimmed.starts_with("@mode") || effective_trimmed.starts_with("@opacity");
+    let is_shell_mode = effective_trimmed.starts_with('!');
+    let is_help_mode = effective_trimmed == "?";
 
     // Content typed after the mode trigger itself (e.g. the path after "@f ",
     // the command after "!"). Once there's real content, hide the mode badge
     // so it stops eating into the width available to show that content -
     // long file paths / shell commands would otherwise get cut off under it.
-    let mode_content = if is_file_mode {
-        trimmed.strip_prefix("@file").or_else(|| trimmed.strip_prefix("@f"))
+    let mode_content = if is_content_mode {
+        effective_trimmed.strip_prefix("@content")
+            .or_else(|| effective_trimmed.strip_prefix("@text"))
+            .or_else(|| effective_trimmed.strip_prefix("@grep"))
+            .or_else(|| effective_trimmed.strip_prefix("@fc"))
+            .or_else(|| effective_trimmed.strip_prefix("@t"))
+    } else if is_file_mode {
+        effective_trimmed.strip_prefix("@file").or_else(|| effective_trimmed.strip_prefix("@f"))
     } else if is_win_mode {
-        trimmed.strip_prefix("@win").or_else(|| trimmed.strip_prefix("@w"))
+        effective_trimmed.strip_prefix("@win").or_else(|| effective_trimmed.strip_prefix("@w"))
     } else if is_clip_mode {
-        trimmed.strip_prefix("@clip").or_else(|| trimmed.strip_prefix("@c"))
+        effective_trimmed.strip_prefix("@clip").or_else(|| effective_trimmed.strip_prefix("@c"))
     } else if is_sys_mode {
-        trimmed.strip_prefix("@power").or_else(|| trimmed.strip_prefix("@sys"))
+        effective_trimmed.strip_prefix("@power").or_else(|| effective_trimmed.strip_prefix("@sys"))
     } else if is_theme_mode {
-        trimmed.strip_prefix("@theme").or_else(|| trimmed.strip_prefix("@mode")).or_else(|| trimmed.strip_prefix("@opacity"))
+        effective_trimmed.strip_prefix("@theme").or_else(|| effective_trimmed.strip_prefix("@mode")).or_else(|| effective_trimmed.strip_prefix("@opacity"))
     } else if is_shell_mode {
-        trimmed.strip_prefix('!')
+        effective_trimmed.strip_prefix('!')
     } else {
         None
     };
@@ -632,6 +1077,8 @@ fn populate_items(
 
     let mode_badge = if has_mode_content {
         ""
+    } else if is_content_mode {
+        "Text"
     } else if is_file_mode {
         "Files"
     } else if is_win_mode {
@@ -650,13 +1097,13 @@ fn populate_items(
         ""
     };
     ui.set_mode_badge_text(mode_badge.into());
-    ui.set_is_file_mode(is_file_mode);
+    ui.set_is_file_mode(is_file_mode || is_content_mode);
     ui.set_is_shell_mode(is_shell_mode);
 
-    use view_launcher::apps::AppCategoryFilter;
-    let is_category_search = !trimmed.starts_with(['@', '!', ':'])
-        && trimmed != "?"
-        && engine.resolve_path_search(trimmed).is_none();
+    use tiarun::apps::AppCategoryFilter;
+    let is_category_search = !effective_trimmed.starts_with(['@', '!', ':'])
+        && effective_trimmed != "?"
+        && engine.resolve_path_search(effective_trimmed).is_none();
     ui.set_categories_enabled(is_category_search);
     let filter = if ui.get_cfg_view_style() == "liquid_glass" && is_category_search {
         AppCategoryFilter::from_chip_name(&ui.get_active_category())
@@ -664,21 +1111,28 @@ fn populate_items(
         AppCategoryFilter::All
     };
 
-    let mut results = if filter == AppCategoryFilter::Actions {
-        engine.search(&format!("@sys {trimmed}"))
+    let (mut results, file_sizes) = if let Some(results) = results {
+        (results.matches, Some(results.file_sizes))
     } else {
-        engine.search(query)
+        let matches = if filter == AppCategoryFilter::Actions {
+            engine.search(&format!("@sys {effective_trimmed}"))
+        } else {
+            engine.search(effective_query)
+        };
+        (matches, None)
     };
     if filter != AppCategoryFilter::All {
         results.retain(|(item, _)| filter.matches(item));
     }
-    if filter == AppCategoryFilter::Help && trimmed.is_empty() {
+    if filter == AppCategoryFilter::Help && effective_trimmed.is_empty() {
         results.extend(engine.search("?"));
     }
     let count = results.len();
     ui.set_has_results(count > 0);
 
-    let (mode_title, item_count_suffix) = if is_file_mode {
+    let (mode_title, item_count_suffix) = if is_content_mode {
+        ("CONTENT SEARCH", "matches")
+    } else if is_file_mode {
         ("FILE SEARCH", "files")
     } else if is_win_mode {
         ("WINDOWS", "windows")
@@ -701,14 +1155,14 @@ fn populate_items(
     let mut current_items = Vec::new();
     let mut slint_items = Vec::new();
 
-    let file_query = if trimmed.starts_with("@file ") {
-        trimmed[6..].trim()
-    } else if trimmed.starts_with("@f ") {
-        trimmed[3..].trim()
+    let file_query = if effective_trimmed.starts_with("@file ") {
+        effective_trimmed[6..].trim()
+    } else if effective_trimmed.starts_with("@f ") {
+        effective_trimmed[3..].trim()
     } else if is_file_mode {
         ""
     } else {
-        trimmed
+        effective_trimmed
     };
 
     if count == 0 {
@@ -738,6 +1192,14 @@ fn populate_items(
             ui.set_empty_state_title("Type a command to run".into());
             ui.set_empty_state_subtitle("e.g. ! ls -la   or   ! echo hello | wc -l".into());
             ui.set_is_empty_folder(false);
+        } else if is_content_mode {
+            ui.set_empty_state_title(format!("No text matches for '{}'", trimmed).into());
+            ui.set_empty_state_subtitle("Search indexed text, documents, and code files".into());
+            ui.set_is_empty_folder(false);
+        } else if is_file_mode {
+            ui.set_empty_state_title(format!("No files found for '{}'", trimmed).into());
+            ui.set_empty_state_subtitle("Try searching with another keyword or path".into());
+            ui.set_is_empty_folder(false);
         } else if !trimmed.is_empty() {
             ui.set_empty_state_title(format!("No results for '{}'", trimmed).into());
             ui.set_empty_state_subtitle("Try searching for an app, file, or math command".into());
@@ -751,8 +1213,15 @@ fn populate_items(
         ui.set_is_empty_folder(false);
     }
 
-    let compute_limit = (engine.config.search.max_results + 3).clamp(8, 20);
-    for (item, _indices) in results.into_iter().take(compute_limit) {
+    let is_unlimited = filter != AppCategoryFilter::All || trimmed.is_empty();
+    let items_iter: Box<dyn Iterator<Item = (launcher::LauncherItem, Vec<usize>)>> = if is_unlimited {
+        Box::new(results.into_iter())
+    } else {
+        let compute_limit = (engine.config.search.max_results + 3).clamp(8, 20);
+        Box::new(results.into_iter().take(compute_limit))
+    };
+
+    for (item, _indices) in items_iter {
         let (slint_icon, category) = match item.item_type {
             launcher::ItemType::App => {
                 let icon = icon_resolver.resolve_icon(item.icon.as_deref(), &item.name, &item.exec_or_path);
@@ -764,10 +1233,14 @@ fn populate_items(
             }
             launcher::ItemType::File => {
                 let icon = icon_resolver.resolve_file_type_icon(Path::new(&item.exec_or_path), launcher::ItemType::File);
-                let size_str = std::fs::metadata(&item.exec_or_path)
-                    .map(|m| launcher::format_file_size(m.len()))
-                    .unwrap_or_else(|_| "File".to_string());
-                (icon, size_str)
+                let tag = if let Some(line) = item.description.as_deref().and_then(|desc| desc.strip_prefix("Line ")) {
+                    line.split_once(':').map_or_else(|| "Content".to_string(), |(number, _)| format!("Line {number}"))
+                } else if let Some(file_sizes) = &file_sizes {
+                    file_sizes.get(&item.exec_or_path).cloned().unwrap_or_else(|| "File".to_string())
+                } else {
+                    file_size_label(&item.exec_or_path)
+                };
+                (icon, tag)
             }
             launcher::ItemType::Calc => {
                 (None, item.description.clone().unwrap_or_else(|| "Calc".to_string()))
@@ -813,6 +1286,39 @@ fn populate_items(
             launcher::ItemType::WebSearch => "web",
         };
 
+        let subtitle = match item.item_type {
+            launcher::ItemType::App => {
+                if let Some(ref desc) = item.description {
+                    let desc_trimmed = desc.trim();
+                    if !desc_trimmed.is_empty() && !desc_trimmed.eq_ignore_ascii_case(&item.name) {
+                        desc_trimmed.to_string()
+                    } else {
+                        launcher::clean_app_exec(&item.exec_or_path)
+                    }
+                } else {
+                    launcher::clean_app_exec(&item.exec_or_path)
+                }
+            }
+            launcher::ItemType::File | launcher::ItemType::Dir => {
+                if let Some(ref desc) = item.description {
+                    if desc.starts_with("Line ") {
+                        desc.clone()
+                    } else {
+                        item.exec_or_path.clone()
+                    }
+                } else {
+                    item.exec_or_path.clone()
+                }
+            }
+            _ => {
+                if let Some(ref desc) = item.description {
+                    desc.clone()
+                } else {
+                    item.exec_or_path.clone()
+                }
+            }
+        };
+
         slint_items.push(LauncherItemData {
             name: item.name.clone().into(),
             category: category.into(),
@@ -820,6 +1326,7 @@ fn populate_items(
             has_icon,
             icon: icon_img,
             exec_or_path: item.exec_or_path.clone().into(),
+            subtitle: subtitle.into(),
         });
 
         current_items.push(item);
@@ -827,6 +1334,8 @@ fn populate_items(
 
     let model = std::rc::Rc::new(slint::VecModel::from(slint_items));
     ui.set_items(model.into());
+
+    update_action_hints(ui, current_items.first(), current_items.len(), 0);
 
     current_items
 }
@@ -851,9 +1360,89 @@ fn apply_theme_command(ui: &AppWindow, cmd: &str) {
     ui.set_cfg_theme_opacity(cfg.theme.opacity);
 }
 
+fn update_preview_for_item(
+    ui: &AppWindow,
+    ui_weak: slint::Weak<AppWindow>,
+    item: Option<&launcher::LauncherItem>,
+    preview_cache: &tiarun::file_preview::PreviewCache,
+    current_image_gen: &Arc<std::sync::atomic::AtomicU64>,
+) {
+    use std::sync::atomic::Ordering;
+
+    let generation = current_image_gen.fetch_add(1, Ordering::Relaxed) + 1;
+    let Some(item) = item.filter(|item| matches!(item.item_type, launcher::ItemType::File | launcher::ItemType::Dir)) else {
+        ui.set_show_preview(false);
+        return;
+    };
+
+    let path = item.exec_or_path.clone();
+    let line = item.description.as_deref()
+        .and_then(|description| description.strip_prefix("Line "))
+        .and_then(|description| description.split_once(':'))
+        .and_then(|(number, _)| number.parse::<usize>().ok());
+    let cache = preview_cache.clone();
+    let current_image_gen = current_image_gen.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(35));
+        if current_image_gen.load(Ordering::Relaxed) != generation {
+            return;
+        }
+
+        let mut preview = cache.get_or_create_preview(&path);
+        let contextual_text = line.and_then(|line| {
+            tiarun::content_search::ContentSearchEngine::get_contextual_preview(&path, line)
+        });
+        let has_context = contextual_text.is_some();
+        if let Some(snippet) = contextual_text {
+            let extension = Path::new(&path).extension().and_then(|ext| ext.to_str())
+                .filter(|ext| !ext.is_empty()).unwrap_or("text");
+            preview.preview_lang = extension.to_uppercase();
+            preview.text_snippet = snippet;
+        }
+        if current_image_gen.load(Ordering::Relaxed) != generation {
+            return;
+        }
+
+        let thumbnail = preview.image_path.as_deref().and_then(|image_path| {
+            cache.get_cached_thumbnail(image_path).or_else(|| {
+                let (width, height, bytes) = tiarun::file_preview::decode_thumbnail_rgba(image_path, 720, 500)?;
+                cache.insert_cached_thumbnail(image_path, width, height, bytes.clone());
+                Some((width, height, bytes))
+            })
+        });
+        let _ = slint::invoke_from_event_loop(move || {
+            if current_image_gen.load(Ordering::Relaxed) != generation {
+                return;
+            }
+            let Some(ui) = ui_weak.upgrade().filter(|ui| {
+                ui.window().is_visible() && ui.get_is_showing_list() && !ui.get_in_settings_mode()
+            }) else { return };
+
+            let image = thumbnail.map(|(width, height, bytes)| {
+                let mut pixels = slint::SharedPixelBuffer::new(width, height);
+                pixels.make_mut_bytes().copy_from_slice(&bytes);
+                slint::Image::from_rgba8(pixels)
+            }).unwrap_or_default();
+            ui.set_preview_title(preview.title.into());
+            ui.set_preview_type(if has_context {
+                "text".into()
+            } else {
+                preview.preview_type.as_str().into()
+            });
+            ui.set_preview_lang(preview.preview_lang.into());
+            ui.set_preview_text(preview.text_snippet.into());
+            ui.set_preview_file_size(preview.file_size.into());
+            ui.set_preview_file_modified(preview.modified_time.into());
+            ui.set_preview_file_location(preview.location.into());
+            ui.set_preview_image(image);
+            ui.set_show_preview(true);
+        });
+    });
+}
+
 fn ensure_selection_visible(ui: &AppWindow, selected_index: i32) {
     if ui.get_cfg_view_style() == "liquid_glass" {
-        let theme = ui.global::<view_launcher::Theme>();
+        let theme = ui.global::<tiarun::Theme>();
         let row_top = theme.get_panel_padding()
             + selected_index as f32 * (theme.get_row_height() + theme.get_row_gap());
         let row_bottom = row_top + theme.get_row_height();
@@ -912,7 +1501,7 @@ fn run_dmenu_mode(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    init_platform_with_app_id("view-launcher")?;
+    init_platform_with_app_id("tiarun")?;
     let ui = AppWindow::new()?;
     #[cfg(target_os = "windows")]
     ui.set_cfg_enable_shadow_margin(false);
@@ -933,10 +1522,15 @@ fn run_dmenu_mode(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
     ui.set_enter_icon(icon_resolver.get_enter_icon());
     ui.set_search_icon(icon_resolver.get_search_icon());
     ui.set_folder_icon(icon_resolver.get_folder_icon());
+    ui.set_scope_apps_icon(icon_resolver.get_scope_apps_icon());
+    ui.set_scope_files_icon(icon_resolver.get_scope_files_icon());
+    ui.set_scope_text_icon(icon_resolver.get_scope_text_icon());
+    ui.set_scope_windows_icon(icon_resolver.get_scope_windows_icon());
 
     ui.window().with_winit_window(|winit_window| {
         winit_window.set_transparent(true);
         winit_window.set_decorations(false);
+        apply_skip_taskbar(winit_window);
         #[cfg(target_os = "windows")]
         {
             winit_window.set_visible(true);
@@ -945,11 +1539,12 @@ fn run_dmenu_mode(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(monitor) = winit_window.current_monitor().or_else(|| winit_window.primary_monitor()) {
             let screen_size = monitor.size();
             let scale_factor = monitor.scale_factor();
+            let monitor_pos = monitor.position();
             let window_width = (f64::from(ui.get_launcher_width()) * scale_factor) as u32;
-            let window_height = (f64::from(ui.get_launcher_height()) * scale_factor) as u32;
-            let pos_x = screen_size.width.saturating_sub(window_width) / 2;
-            let pos_y = screen_size.height.saturating_sub(window_height) / 2;
-            winit_window.set_outer_position(i_slint_backend_winit::winit::dpi::PhysicalPosition::new(pos_x as i32, pos_y as i32));
+            let _window_height = (f64::from(ui.get_launcher_height()) * scale_factor) as u32;
+            let pos_x = monitor_pos.x + (screen_size.width.saturating_sub(window_width) / 2) as i32;
+            let pos_y = monitor_pos.y + (screen_size.height as f64 * 0.15) as i32;
+            winit_window.set_outer_position(i_slint_backend_winit::winit::dpi::PhysicalPosition::new(pos_x, pos_y));
         }
     });
 
@@ -1001,6 +1596,7 @@ fn run_dmenu_mode(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
                     has_icon: false,
                     icon: slint::Image::default(),
                     exec_or_path: l.clone().into(),
+                    subtitle: l.clone().into(),
                 })
                 .collect();
             ui.set_items(std::rc::Rc::new(slint::VecModel::from(slint_items)).into());
@@ -1106,14 +1702,34 @@ fn reveal_after_sway_placement(ui: slint::Weak<AppWindow>, deadline: Instant) {
     });
 }
 
+#[cfg(all(unix, not(target_os = "macos")))]
+fn reveal_after_hyprland_placement(ui: slint::Weak<AppWindow>, deadline: Instant) {
+    slint::Timer::single_shot(Duration::from_millis(8), move || {
+        if let Some(window) = ui.upgrade().filter(|ui| ui.window().is_visible()) {
+            if place_hyprland_launcher(&window).is_some() || Instant::now() >= deadline {
+                window.invoke_focus_search();
+                window.set_is_pop_visible(true);
+            } else {
+                reveal_after_hyprland_placement(ui, deadline);
+            }
+        }
+    });
+}
+
 fn animate_window_pop_in(ui_weak: slint::Weak<AppWindow>) {
     if let Some(ui) = ui_weak.upgrade() {
         ui.set_is_pop_visible(false);
         #[cfg(all(unix, not(target_os = "macos")))]
-        if std::env::var_os("SWAYSOCK").is_some() {
-            // Allow the compositor to map the window, then place it before fading in.
-            reveal_after_sway_placement(ui_weak, Instant::now() + Duration::from_millis(120));
-            return;
+        {
+            if std::env::var_os("SWAYSOCK").is_some() {
+                // Allow the compositor to map the window, then place it before fading in.
+                reveal_after_sway_placement(ui_weak, Instant::now() + Duration::from_millis(120));
+                return;
+            }
+            if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+                reveal_after_hyprland_placement(ui_weak, Instant::now() + Duration::from_millis(120));
+                return;
+            }
         }
     }
     slint::Timer::single_shot(std::time::Duration::from_millis(8), move || {
@@ -1136,12 +1752,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--version" || a == "-v") {
-        println!("view-launcher {}", env!("CARGO_PKG_VERSION"));
+        println!("tiarun {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "View Launcher {}\nUsage: view-launcher [OPTIONS]\n\nOptions:\n  -d, --dmenu         Run in dmenu pipe mode\n  -p, --prompt <TEXT> Custom prompt in dmenu mode\n  -q, --quit          Quit running background launcher daemon\n  -v, --version       Show version\n  -h, --help          Show help",
+            "TiaRun {}\nUsage: tiarun [OPTIONS]\n\nOptions:\n  -b, --daemon        Start resident background daemon without showing window\n  -d, --dmenu         Run in dmenu pipe mode\n  -p, --prompt <TEXT> Custom prompt in dmenu mode\n  -q, --quit          Quit running background launcher daemon\n  -v, --version       Show version\n  -h, --help          Show help",
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
@@ -1152,7 +1768,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let socket_path = get_socket_path();
             if let Ok(mut stream) = UnixStream::connect(&socket_path) {
                 let _ = stream.write_all(b"quit");
-                println!("view-launcher daemon stopped.");
+                println!("tiarun daemon stopped.");
                 return Ok(());
             }
         }
@@ -1161,11 +1777,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let addr: SocketAddr = "127.0.0.1:42425".parse().unwrap();
             if let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
                 let _ = stream.write_all(b"quit");
-                println!("view-launcher daemon stopped.");
+                println!("tiarun daemon stopped.");
                 return Ok(());
             }
         }
-        println!("view-launcher is not running.");
+        println!("tiarun is not running.");
         return Ok(());
     }
 
@@ -1183,6 +1799,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return run_dmenu_mode(&prompt);
     }
 
+    let is_daemon = args.iter().any(|a| a == "--daemon" || a == "-b" || a == "--background");
+
     let non_flag_args: Vec<&String> = args.iter().skip(1).filter(|a| !a.starts_with('-')).collect();
     let initial_query = if !non_flag_args.is_empty() {
         let q = non_flag_args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
@@ -1192,24 +1810,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // 0. Super-fast single-instance check BEFORE allocating GPU or Window (<0.2ms!)
-    let msg_to_send = if let Some(ref q) = initial_query {
+    let msg_to_send = if is_daemon {
+        b"ping".to_vec()
+    } else if let Some(ref q) = initial_query {
         format!("query:{}", q).into_bytes()
     } else {
         b"toggle".to_vec()
     };
     if try_send_to_existing_instance(&msg_to_send) {
+        if is_daemon {
+            println!("tiarun daemon is already running.");
+        }
         return Ok(());
     }
 
     let exit_trigger = Arc::new(AtomicBool::new(false));
 
-    // Identify this window to the compositor/WM as "view-launcher" so Wayland
+    // Identify this window to the compositor/WM as "tiarun" so Wayland
     // (app_id) and X11 (WM_CLASS) window managers can match it to the installed
-    // .desktop entry (assets/view-launcher.desktop: Icon=view-launcher,
-    // StartupWMClass=view-launcher) and show the real app icon in the dock/
+    // .desktop entry (assets/tiarun.desktop: Icon=tiarun,
+    // StartupWMClass=tiarun) and show the real app icon in the dock/
     // taskbar instead of falling back to a generic one. Must run before the
     // window is created (see init_platform_with_app_id's doc comment).
-    init_platform_with_app_id("view-launcher")?;
+    init_platform_with_app_id("tiarun")?;
 
     // 1. Create main Slint Window for primary resident daemon
     let ui = AppWindow::new()?;
@@ -1251,16 +1874,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Setup global shortcut and currency rate cache in background (non-blocking)
     std::thread::spawn(|| {
-        view_launcher::config::setup_global_shortcut();
+        tiarun::config::setup_global_shortcut();
     });
-    view_launcher::calc::init_currency_rates();
+    tiarun::calc::init_currency_rates();
 
     // 3. Load Config & Initialize Engine
     let config = Config::load();
-    ui.set_cfg_autostart(view_launcher::config::is_autostart_enabled());
+    ui.set_cfg_autostart(tiarun::config::is_autostart_enabled());
     ui.set_cfg_show_icons(config.theme.show_icons.unwrap_or(true));
     ui.set_cfg_show_status_bar(config.theme.show_status_bar.unwrap_or(true));
-    ui.set_cfg_compact_empty(config.theme.compact_empty_view.unwrap_or(false));
+    ui.set_cfg_compact_empty(config.theme.compact_empty_view.unwrap_or(true));
     ui.set_cfg_view_style(config.theme.view_style.clone().into());
     ui.set_cfg_enable_path_matching(config.search.enable_path_matching.unwrap_or(true));
     ui.set_cfg_max_results(config.search.max_results as i32);
@@ -1272,58 +1895,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine = Arc::new(LauncherEngine::new(config));
     let icon_resolver = Arc::new(IconResolver::new());
 
+    let categories: Vec<slint::SharedString> = engine
+        .available_categories()
+        .into_iter()
+        .map(Into::into)
+        .collect();
+    ui.set_categories(std::rc::Rc::new(slint::VecModel::from(categories)).into());
+
     // Set UI action icons
     ui.set_settings_icon(icon_resolver.get_gear_icon());
     ui.set_nav_icon(icon_resolver.get_nav_icon());
     ui.set_enter_icon(icon_resolver.get_enter_icon());
     ui.set_search_icon(icon_resolver.get_search_icon());
     ui.set_folder_icon(icon_resolver.get_folder_icon());
+    ui.set_scope_apps_icon(icon_resolver.get_scope_apps_icon());
+    ui.set_scope_files_icon(icon_resolver.get_scope_files_icon());
+    ui.set_scope_text_icon(icon_resolver.get_scope_text_icon());
+    ui.set_scope_windows_icon(icon_resolver.get_scope_windows_icon());
 
-    // Window properties & Icon
-    let app_icon_opt = image::load_from_memory(include_bytes!("../assets/view-launcher.png"))
-        .ok()
-        .and_then(|img| {
-            let rgba = img.to_rgba8();
-            let (width, height) = rgba.dimensions();
-            i_slint_backend_winit::winit::window::Icon::from_rgba(rgba.into_raw(), width, height).ok()
-        });
-
+    // Window properties (Skip Taskbar / Tool Window overlay)
     ui.window().with_winit_window(move |winit_window| {
-        winit_window.set_title("View Launcher");
+        winit_window.set_title("TiaRun");
         winit_window.set_transparent(true);
         winit_window.set_decorations(false);
+        apply_skip_taskbar(winit_window);
         #[cfg(target_os = "windows")]
         {
-            winit_window.set_visible(true);
-            winit_window.focus_window();
-        }
-        if let Some(icon) = app_icon_opt {
-            winit_window.set_window_icon(Some(icon));
+            if !is_daemon {
+                winit_window.set_visible(true);
+                winit_window.focus_window();
+            }
         }
     });
 
     let center_window = |ui: &AppWindow| {
-        ui.window().with_winit_window(|winit_window| {
-            let monitor_opt = winit_window
-                .current_monitor()
-                .or_else(|| winit_window.primary_monitor())
-                .or_else(|| winit_window.available_monitors().next());
-
-            if let Some(monitor) = monitor_opt {
-                let screen_size = monitor.size();
-                let scale_factor = monitor.scale_factor();
-                let window_width = (f64::from(ui.get_launcher_width()) * scale_factor) as u32;
-                let window_height = (f64::from(ui.get_launcher_height()) * scale_factor) as u32;
-                let pos_x = screen_size.width.saturating_sub(window_width) / 2;
-                let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland");
-                let pos_y = if is_wayland {
-                    screen_size.height.saturating_sub(window_height) / 2
-                } else {
-                    (screen_size.height as f64 * 0.28) as u32
-                };
-                winit_window.set_outer_position(i_slint_backend_winit::winit::dpi::PhysicalPosition::new(pos_x as i32, pos_y as i32));
-            }
-        });
+        reposition_and_anchor_window(ui);
     };
 
     center_window(&ui);
@@ -1334,17 +1940,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         let (_blur_backend, status, tier_name) = ui.window().with_winit_window(|winit_window| {
-            view_launcher::blur::detect_blur_backend(winit_window)
-        }).unwrap_or_else(|| (Box::new(view_launcher::blur::fallback::FallbackBlurBackend), view_launcher::blur::BlurStatus::Fallback, "Fallback".to_string()));
+            tiarun::blur::detect_blur_backend(winit_window)
+        }).unwrap_or_else(|| (Box::new(tiarun::blur::fallback::FallbackBlurBackend), tiarun::blur::BlurStatus::Fallback, "Fallback".to_string()));
 
         let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "unknown".to_string());
         let current_desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "unknown".to_string());
         println!(
-            "[view-launcher] Session: {}, Desktop: {}, Blur: {} ({:?}), Placement: Centered overlay",
+            "[tiarun] Session: {}, Desktop: {}, Blur: {} ({:?}), Placement: Centered overlay",
             session_type, current_desktop, tier_name, status
         );
 
-        let has_blur = status != view_launcher::blur::BlurStatus::Fallback;
+        let has_blur = status != tiarun::blur::BlurStatus::Fallback;
         ui.set_has_blur(has_blur);
     }
 
@@ -1385,7 +1991,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // window can paint and respond to input between chunks, rather than blocking
     // startup on the full list.
     #[cfg(target_os = "windows")]
-    warm_icon_cache_chunked(icon_resolver.clone(), engine.apps.clone(), 0);
+    {
+        if is_daemon {
+            let resolver = icon_resolver.clone();
+            let apps = engine.apps.clone();
+            slint::Timer::single_shot(Duration::from_secs(3), move || {
+                warm_icon_cache_chunked(resolver, apps, 0);
+            });
+        } else {
+            warm_icon_cache_chunked(icon_resolver.clone(), engine.apps.clone(), 0);
+        }
+    }
     #[cfg(not(target_os = "windows"))]
     icon_resolver.preload_icons(&engine.apps);
 
@@ -1419,24 +2035,143 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    // 5. Connect Search Text Changed
-    {
-        let engine = engine.clone();
-        let icon_resolver = icon_resolver.clone();
-        let current_results = current_results.clone();
-        let ui_weak = ui.as_weak();
+    let preview_cache = tiarun::file_preview::PreviewCache::new();
+    let current_image_gen = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-        ui.on_search_text_changed(move |text| {
-            if let Some(ui) = ui_weak.upgrade() {
-                ui.set_is_expanded(!text.is_empty() || (ui.get_cfg_view_style() == "liquid_glass"
-                    && !ui.get_active_category().is_empty()));
-                resize_window_for_state(&ui);
-                let items = populate_items(&ui, &engine, &icon_resolver, &text);
+    // File and content searches can touch the filesystem on every keystroke.
+    // One worker coalesces pending queries and only publishes the current one.
+    {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::mpsc::{self, RecvTimeoutError};
+
+        let (send, receive) = mpsc::channel::<(u64, String, String, String)>();
+        let (send_results, receive_results) = mpsc::channel();
+        let generation = Arc::new(AtomicU64::new(0));
+        let publish = {
+            let engine = engine.clone();
+            let icon_resolver = icon_resolver.clone();
+            let current_results = current_results.clone();
+            let preview_cache = preview_cache.clone();
+            let current_image_gen = current_image_gen.clone();
+            move |ui: &AppWindow, query: &str, effective: &str, results| {
+                let items = render_search_results(ui, &engine, &icon_resolver, query, effective, results);
+                let preview_item = items.first().filter(|_| ui.get_is_showing_list());
+                update_preview_for_item(ui, ui.as_weak(), preview_item, &preview_cache, &current_image_gen);
                 if let Ok(mut lock) = current_results.write() {
                     *lock = items;
                 }
                 ui.set_selected_index(0);
                 ui.set_scroll_viewport_y(0.0);
+            }
+        };
+
+        let worker_engine = engine.clone();
+        let worker_generation = generation.clone();
+        let ui_weak = ui.as_weak();
+        std::thread::spawn(move || {
+            while let Ok(mut request) = receive.recv() {
+                loop {
+                    match receive.recv_timeout(Duration::from_millis(20)) {
+                        Ok(newer) => request = newer,
+                        Err(RecvTimeoutError::Timeout) => break,
+                        Err(RecvTimeoutError::Disconnected) => return,
+                    }
+                }
+                let (id, query, scope, effective) = request;
+                if worker_generation.load(Ordering::Relaxed) != id {
+                    continue;
+                }
+                let cancelled = || worker_generation.load(Ordering::Relaxed) != id;
+                let matches = worker_engine.search_until_cancelled(&effective, &cancelled);
+                if cancelled() {
+                    continue;
+                }
+                let max_rows = if query.trim().is_empty() {
+                    matches.len()
+                } else {
+                    (worker_engine.config.search.max_results + 3).clamp(8, 20)
+                };
+                let file_sizes = matches.iter().take(max_rows)
+                    .take_while(|_| !cancelled())
+                    .filter(|(item, _)| item.item_type == launcher::ItemType::File
+                        && !item.description.as_deref().is_some_and(|desc| desc.starts_with("Line ")))
+                    .map(|(item, _)| (item.exec_or_path.clone(), file_size_label(&item.exec_or_path)))
+                    .collect();
+                if cancelled() {
+                    continue;
+                }
+                let results = FileSearchResults { matches, file_sizes };
+                if send_results.send((id, query, scope, effective, results)).is_err() {
+                    break;
+                }
+                let ui_weak = ui_weak.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        ui.invoke_file_search_finished();
+                    }
+                });
+            }
+        });
+
+        {
+            let generation = generation.clone();
+            let publish = publish.clone();
+            let ui_weak = ui.as_weak();
+            ui.on_file_search_finished(move || {
+                if let Some((id, query, scope, effective, results)) = receive_results.try_iter().last() {
+                    if let Some(ui) = ui_weak.upgrade().filter(|ui| {
+                        generation.load(Ordering::Relaxed) == id
+                            && ui.window().is_visible()
+                            && !ui.get_in_settings_mode()
+                            && ui.get_search_text() == query.as_str()
+                            && ui.get_active_scope() == scope.as_str()
+                    }) {
+                        publish(&ui, &query, &effective, Some(results));
+                    }
+                }
+            });
+        }
+
+        let engine = engine.clone();
+        let current_results = current_results.clone();
+        let current_image_gen = current_image_gen.clone();
+        let schedule = move |ui: &AppWindow, text: &str, keep_expanded: bool| {
+            let id = generation.fetch_add(1, Ordering::Relaxed) + 1;
+            let effective = effective_search_query(ui, &engine, text);
+            let scope = ui.get_active_scope();
+            let file_scope = matches!(scope.as_str(), "files" | "text");
+            ui.set_is_expanded(keep_expanded || !text.is_empty() || file_scope
+                || (ui.get_cfg_view_style() == "liquid_glass" && !ui.get_active_category().is_empty()));
+            resize_window_for_state(ui);
+
+            let search_files = effective.trim().starts_with('@') && file_scope
+                || effective.trim().starts_with(['/', '~'])
+                || (!effective.trim().starts_with(['@', '!', ':'])
+                    && (effective.contains(['/', '\\']) || effective.as_bytes().get(1) == Some(&b':')));
+            if search_files {
+                // Keep the previous rows visible while typing, but prevent
+                // activating them after they no longer match the query.
+                if let Ok(mut lock) = current_results.write() {
+                    lock.clear();
+                }
+                current_image_gen.fetch_add(1, Ordering::Relaxed);
+                let _ = send.send((id, text.to_string(), scope.to_string(), effective));
+            } else {
+                publish(ui, text, &effective, None);
+            }
+        };
+        let ui_weak = ui.as_weak();
+        let schedule_edit = schedule.clone();
+        ui.on_search_text_changed(move |text| {
+            if let Some(ui) = ui_weak.upgrade() {
+                schedule_edit(&ui, &text, false);
+            }
+        });
+        let ui_weak = ui.as_weak();
+        ui.on_scope_selected(move |scope| {
+            if let Some(ui) = ui_weak.upgrade() {
+                let query = switch_to_scope(&ui, &scope);
+                schedule(&ui, &query, true);
             }
         });
     }
@@ -1449,8 +2184,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_weak = ui.as_weak();
         ui.on_chip_selected(move |category| {
             if let Some(ui) = ui_weak.upgrade() {
-                ui.set_active_category(category);
+                ui.set_active_category(category.clone());
                 ui.set_is_expanded(true);
+                // When selecting a category chip, automatically clear the search text so all apps
+                // in the chosen category appear immediately instead of being filtered by previous text.
+                if !category.is_empty() {
+                    ui.set_search_text("".into());
+                }
                 resize_window_for_state(&ui);
                 let items = populate_items(&ui, &engine, &icon_resolver, &ui.get_search_text());
                 ui.set_scroll_viewport_y(0.0);
@@ -1461,6 +2201,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
+
+fn strip_scope_prefixes(raw: &str) -> String {
+    if let Some(rest) = raw.strip_prefix("@file ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@f ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@text ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@content ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@grep ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@fc ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@t ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@win ") {
+        rest.to_string()
+    } else if let Some(rest) = raw.strip_prefix("@w ") {
+        rest.to_string()
+    } else {
+        raw.to_string()
+    }
+}
+
+fn switch_to_scope(ui: &AppWindow, target_scope: &str) -> String {
+    ui.set_active_scope(target_scope.into());
+    ui.set_is_expanded(true);
+
+    let raw_text = ui.get_search_text().to_string();
+    let mut clean_query = strip_scope_prefixes(&raw_text);
+
+    // If moving to a non-files scope (e.g. text, windows, apps) and the query is a directory path
+    // (ends with '/', or starts with '~' or '/', or Windows drive path), clear it so it doesn't pollute the new scope.
+    if target_scope != "files" {
+        let trimmed_q = clean_query.trim();
+        let is_dir_path = trimmed_q.ends_with('/')
+            || trimmed_q.ends_with('\\')
+            || trimmed_q.starts_with('~')
+            || trimmed_q.starts_with('/')
+            || (cfg!(windows) && trimmed_q.len() >= 2 && trimmed_q.as_bytes()[1] == b':');
+        if is_dir_path {
+            clean_query = String::new();
+        }
+    }
+
+    if clean_query != raw_text {
+        ui.set_search_text(clean_query.clone().into());
+        ui.invoke_move_cursor_to_end();
+    }
+
+    clean_query
+}
 
     // 5.0 Shell ("!") command history recall — Up/Down cycle through past commands,
     // like a real shell. `shell_history_cursor` is -1 when not currently browsing
@@ -1520,8 +2313,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let ui_weak = ui.as_weak();
         let current_results = current_results.clone();
+        let preview_cache = preview_cache.clone();
+        let current_image_gen = current_image_gen.clone();
         ui.on_move_up(move || {
             if let Some(ui) = ui_weak.upgrade() {
+                if ui.get_search_text().is_empty() && ui.get_selected_index() <= 0 && ui.get_is_expanded() {
+                    ui.set_is_expanded(false);
+                    ui.set_show_preview(false);
+                    resize_window_for_state(&ui);
+                    return;
+                }
                 let total = if let Ok(lock) = current_results.read() {
                     lock.len() as i32
                 } else {
@@ -1532,6 +2333,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let next = if cur <= 0 { total - 1 } else { cur - 1 };
                 ui.set_selected_index(next);
                 ensure_selection_visible(&ui, next);
+                if let Ok(lock) = current_results.read() {
+                    update_action_hints(&ui, lock.get(next as usize), total as usize, next as usize);
+                }
+                let query = ui.get_search_text();
+                let trimmed = query.trim();
+                let scope = ui.get_active_scope().to_string();
+                let is_file_or_content = scope == "files" || scope == "text"
+                    || trimmed.starts_with("@f")
+                    || trimmed.starts_with("@file")
+                    || trimmed.starts_with("@content")
+                    || trimmed.starts_with("@text")
+                    || trimmed.starts_with("@grep")
+                    || trimmed.starts_with("@fc")
+                    || trimmed.starts_with("@t")
+                    || trimmed.starts_with('/')
+                    || trimmed.starts_with('~');
+                let is_showing_list = ui.get_is_showing_list();
+                if let Ok(lock) = current_results.read() {
+                    let item = lock.get(next as usize);
+                    let should_preview = is_showing_list && (is_file_or_content
+                        || item.map(|it| it.item_type == launcher::ItemType::File || it.item_type == launcher::ItemType::Dir).unwrap_or(false));
+                    if should_preview {
+                        update_preview_for_item(&ui, ui.as_weak(), item, &preview_cache, &current_image_gen);
+                    } else {
+                        ui.set_show_preview(false);
+                    }
+                }
+                resize_window_for_state(&ui);
             }
         });
     }
@@ -1540,8 +2369,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let ui_weak = ui.as_weak();
         let current_results = current_results.clone();
+        let preview_cache = preview_cache.clone();
+        let current_image_gen = current_image_gen.clone();
         ui.on_move_down(move || {
             if let Some(ui) = ui_weak.upgrade() {
+                if ui.get_search_text().is_empty() && !ui.get_is_expanded() {
+                    ui.set_is_expanded(true);
+                    resize_window_for_state(&ui);
+                    return;
+                }
                 let total = if let Ok(lock) = current_results.read() {
                     lock.len() as i32
                 } else {
@@ -1552,116 +2388,186 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let next = if cur + 1 >= total { 0 } else { cur + 1 };
                 ui.set_selected_index(next);
                 ensure_selection_visible(&ui, next);
+                if let Ok(lock) = current_results.read() {
+                    update_action_hints(&ui, lock.get(next as usize), total as usize, next as usize);
+                }
+                let query = ui.get_search_text();
+                let trimmed = query.trim();
+                let scope = ui.get_active_scope().to_string();
+                let is_file_or_content = scope == "files" || scope == "text"
+                    || trimmed.starts_with("@f")
+                    || trimmed.starts_with("@file")
+                    || trimmed.starts_with("@content")
+                    || trimmed.starts_with("@text")
+                    || trimmed.starts_with("@grep")
+                    || trimmed.starts_with("@fc")
+                    || trimmed.starts_with("@t")
+                    || trimmed.starts_with('/')
+                    || trimmed.starts_with('~');
+                let is_showing_list = ui.get_is_showing_list();
+                if let Ok(lock) = current_results.read() {
+                    let item = lock.get(next as usize);
+                    let should_preview = is_showing_list && (is_file_or_content
+                        || item.map(|it| it.item_type == launcher::ItemType::File || it.item_type == launcher::ItemType::Dir).unwrap_or(false));
+                    if should_preview {
+                        update_preview_for_item(&ui, ui.as_weak(), item, &preview_cache, &current_image_gen);
+                    } else {
+                        ui.set_show_preview(false);
+                    }
+                }
+                resize_window_for_state(&ui);
             }
         });
     }
 
-    // 5.3 Connect Tab Pressed (Navigate Into Directory)
+    fn step_into_directory(
+        ui: &AppWindow,
+        current_results: &Arc<std::sync::RwLock<Vec<launcher::LauncherItem>>>,
+    ) -> bool {
+        let sel_idx = ui.get_selected_index() as usize;
+        let item_opt = {
+            if let Ok(lock) = current_results.read() {
+                lock.get(sel_idx).cloned()
+            } else {
+                None
+            }
+        };
+
+        if let Some(item) = item_opt {
+            if item.item_type == launcher::ItemType::Dir {
+                let search_text = ui.get_search_text().to_string();
+                let mut path = item.exec_or_path;
+                if let Some(home) = dirs::home_dir() {
+                    let home_str = home.to_string_lossy().to_string();
+                    if path.starts_with(&home_str) {
+                        path = format!("~{}", &path[home_str.len()..]);
+                    }
+                }
+                if !path.ends_with('/') {
+                    path.push('/');
+                }
+                let prefix = if search_text.starts_with("@file ") || search_text == "@file" {
+                    "@file "
+                } else if search_text.starts_with("@f ") || search_text == "@f" {
+                    "@f "
+                } else {
+                    ""
+                };
+                let new_search_text = format!("{}{}", prefix, path);
+                ui.set_search_text(new_search_text.clone().into());
+                ui.invoke_move_cursor_to_end();
+                ui.invoke_search_text_changed(new_search_text.into());
+                return true;
+            }
+        }
+        false
+    }
+
+    // 5.3 Connect Handle Right Arrow (Drill Into Directory)
     {
-        let engine = engine.clone();
-        let icon_resolver = icon_resolver.clone();
         let current_results = current_results.clone();
         let ui_weak = ui.as_weak();
 
-        ui.on_tab_pressed(move || {
+        ui.on_handle_right_arrow(move || -> bool {
             if let Some(ui) = ui_weak.upgrade() {
-                let search_text = ui.get_search_text().to_string();
-                let is_file_mode = search_text.starts_with("@f") || search_text.starts_with("@file");
-                let is_path_mode = search_text.starts_with('/') || search_text.starts_with('~');
-                if is_file_mode || is_path_mode {
-                    let sel_idx = ui.get_selected_index() as usize;
-                    let item_opt = {
-                        if let Ok(lock) = current_results.read() {
-                            lock.get(sel_idx).cloned()
-                        } else {
-                            None
-                        }
-                    };
-
-                    if let Some(item) = item_opt {
-                        if item.item_type == launcher::ItemType::Dir {
-                            let mut path = item.exec_or_path;
-                            if let Some(home) = dirs::home_dir() {
-                                let home_str = home.to_string_lossy().to_string();
-                                if path.starts_with(&home_str) {
-                                    path = format!("~{}", &path[home_str.len()..]);
-                                }
-                            }
-                            if !path.ends_with('/') {
-                                path.push('/');
-                            }
-                            let prefix = if search_text.starts_with("@file ") || search_text == "@file" {
-                                "@file "
-                            } else if search_text.starts_with("@f ") || search_text == "@f" {
-                                "@f "
-                            } else {
-                                ""
-                            };
-                            let new_search_text = format!("{}{}", prefix, path);
-                            ui.set_search_text(new_search_text.clone().into());
-                            ui.invoke_move_cursor_to_end();
-                            let items = populate_items(&ui, &engine, &icon_resolver, &new_search_text);
-                            if let Ok(mut lock) = current_results.write() {
-                                *lock = items;
-                            }
-                            ui.set_selected_index(0);
-                            ui.set_scroll_viewport_y(0.0);
-                        }
-                    }
-                }
+                step_into_directory(&ui, &current_results)
+            } else {
+                false
             }
         });
     }
 
-    // 5.4 Connect Handle Backspace (Step Out to Parent Directory)
+    // 5.3b Connect Tab and Shift+Tab (Scope cycling loop)
     {
-        let engine = engine.clone();
-        let icon_resolver = icon_resolver.clone();
-        let current_results = current_results.clone();
+        let ui_weak = ui.as_weak();
+        ui.on_tab_pressed(move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let cur_scope = ui.get_active_scope().to_string();
+                let next_scope = match cur_scope.as_str() {
+                    "apps" => "files",
+                    "files" => "text",
+                    "text" => "windows",
+                    _ => "apps",
+                };
+                ui.invoke_scope_selected(next_scope.into());
+                ui.invoke_move_cursor_to_end();
+            }
+        });
+    }
+
+    {
+        let ui_weak = ui.as_weak();
+        ui.on_backtab_pressed(move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let cur_scope = ui.get_active_scope().to_string();
+                let prev_scope = match cur_scope.as_str() {
+                    "windows" => "text",
+                    "text" => "files",
+                    "files" => "apps",
+                    _ => "windows",
+                };
+                ui.invoke_scope_selected(prev_scope.into());
+                ui.invoke_move_cursor_to_end();
+            }
+        });
+    }
+
+fn step_out_directory(
+    ui: &AppWindow,
+) -> bool {
+    let search_text = ui.get_search_text().to_string();
+    let is_file_mode = search_text.starts_with("@f ") || search_text.starts_with("@file ");
+    let is_path_mode = search_text.starts_with('/') || search_text.starts_with('~');
+    if (is_file_mode || is_path_mode) && search_text.ends_with('/') {
+        let prefix_len = if search_text.starts_with("@file ") {
+            6
+        } else if search_text.starts_with("@f ") {
+            3
+        } else {
+            0
+        };
+        let path_part = &search_text[prefix_len..];
+        let trimmed_path = path_part.trim_end_matches('/');
+        if let Some(pos) = trimmed_path.rfind('/') {
+            let parent_path = &trimmed_path[..=pos];
+            let new_search_text = format!("{}{}", &search_text[..prefix_len], parent_path);
+            ui.set_search_text(new_search_text.clone().into());
+            ui.invoke_move_cursor_to_end();
+            ui.invoke_search_text_changed(new_search_text.into());
+            return true;
+        } else {
+            let new_search_text = format!("{}", &search_text[..prefix_len]);
+            ui.set_search_text(new_search_text.clone().into());
+            ui.invoke_move_cursor_to_end();
+            ui.invoke_search_text_changed(new_search_text.into());
+            return true;
+        }
+    }
+    false
+}
+
+    // 5.4 Connect Handle Backspace & Left Arrow (Step Out to Parent Directory)
+    {
         let ui_weak = ui.as_weak();
 
         ui.on_handle_backspace(move || -> bool {
             if let Some(ui) = ui_weak.upgrade() {
-                let search_text = ui.get_search_text().to_string();
-                let is_file_mode = search_text.starts_with("@f ") || search_text.starts_with("@file ");
-                let is_path_mode = search_text.starts_with('/') || search_text.starts_with('~');
-                if (is_file_mode || is_path_mode) && search_text.ends_with('/') {
-                    let prefix_len = if search_text.starts_with("@file ") {
-                        6
-                    } else if search_text.starts_with("@f ") {
-                        3
-                    } else {
-                        0
-                    };
-                    let path_part = &search_text[prefix_len..];
-                    let trimmed_path = path_part.trim_end_matches('/');
-                    if let Some(pos) = trimmed_path.rfind('/') {
-                        let parent_path = &trimmed_path[..=pos];
-                        let new_search_text = format!("{}{}", &search_text[..prefix_len], parent_path);
-                        ui.set_search_text(new_search_text.clone().into());
-                        ui.invoke_move_cursor_to_end();
-                        let items = populate_items(&ui, &engine, &icon_resolver, &new_search_text);
-                        if let Ok(mut lock) = current_results.write() {
-                            *lock = items;
-                        }
-                        ui.set_selected_index(0);
-                        ui.set_scroll_viewport_y(0.0);
-                        return true;
-                    } else {
-                        let new_search_text = format!("{}", &search_text[..prefix_len]);
-                        ui.set_search_text(new_search_text.clone().into());
-                        ui.invoke_move_cursor_to_end();
-                        let items = populate_items(&ui, &engine, &icon_resolver, &new_search_text);
-                        if let Ok(mut lock) = current_results.write() {
-                            *lock = items;
-                        }
-                        ui.set_selected_index(0);
-                        ui.set_scroll_viewport_y(0.0);
-                        return true;
-                    }
-                }
+                step_out_directory(&ui)
+            } else {
+                false
             }
-            false
+        });
+    }
+
+    {
+        let ui_weak = ui.as_weak();
+
+        ui.on_handle_left_arrow(move || -> bool {
+            if let Some(ui) = ui_weak.upgrade() {
+                step_out_directory(&ui)
+            } else {
+                false
+            }
         });
     }
 
@@ -1697,6 +2603,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ui) = ui_weak.upgrade() {
                     let _ = ui.hide();
                     ui.set_search_text("".into());
+                    ui.set_active_scope("apps".into());
                     ui.set_is_expanded(false);
                 }
                 engine.launch(&item);
@@ -1724,6 +2631,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ui) = ui_weak.upgrade() {
                     let _ = ui.hide();
                     ui.set_search_text("".into());
+                    ui.set_active_scope("apps".into());
                     ui.set_is_expanded(false);
                 }
                 engine.open_in_terminal(&item);
@@ -1752,17 +2660,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // 8.1 Connect Smart Copy Item (Ctrl+C)
+    {
+        let engine = engine.clone();
+        let current_results = current_results.clone();
+
+        ui.on_copy_item(move |idx| {
+            let idx = idx as usize;
+            let item_opt = {
+                if let Ok(lock) = current_results.read() {
+                    lock.get(idx).cloned()
+                } else {
+                    None
+                }
+            };
+
+            if let Some(item) = item_opt {
+                engine.copy_item_smart(&item);
+            }
+        });
+    }
+
     // 9. Connect Open Settings View (Ctrl+,)
     {
         let ui_weak = ui.as_weak();
         ui.on_open_config(move || {
             let start = std::time::Instant::now();
-            if std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_open_config ENTER at {:?}", start);
             }
             if let Some(ui) = ui_weak.upgrade() {
                 let cfg = Config::load();
-                ui.set_cfg_autostart(view_launcher::config::is_autostart_enabled());
+                ui.set_cfg_autostart(tiarun::config::is_autostart_enabled());
                 ui.set_cfg_theme_mode(cfg.theme.mode.clone().into());
                 ui.set_cfg_theme_opacity(cfg.theme.opacity);
                 ui.set_is_dark(cfg.theme.is_dark());
@@ -1771,7 +2700,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 resize_window_for_state(&ui);
                 ui.invoke_focus_settings();
             }
-            if std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_open_config EXIT in {:?}", start.elapsed());
             }
         });
@@ -1782,7 +2711,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_weak = ui.as_weak();
         ui.on_close_settings(move || {
             let start = std::time::Instant::now();
-            if std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_close_settings ENTER at {:?}", start);
             }
             if let Some(ui) = ui_weak.upgrade() {
@@ -1790,7 +2719,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 resize_window_for_state(&ui);
                 ui.invoke_focus_search();
             }
-            if std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_close_settings EXIT in {:?}", start.elapsed());
             }
         });
@@ -1841,7 +2770,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_weak = ui.as_weak();
         ui.on_request_system_theme(move || {
             if let Some(ui) = ui_weak.upgrade() {
-                let is_dark = view_launcher::config::is_system_dark_mode();
+                let is_dark = tiarun::config::is_system_dark_mode();
                 ui.set_is_dark(is_dark);
             }
         });
@@ -1854,7 +2783,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(ui) = ui_weak.upgrade() {
                 let _ = ui.hide();
                 ui.set_search_text("".into());
+                ui.set_active_scope("apps".into());
                 ui.set_is_expanded(false);
+                ui.set_show_preview(false);
             }
         });
     }
@@ -1881,7 +2812,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 #[cfg(not(target_os = "windows"))]
                 std::thread::sleep(std::time::Duration::from_millis(400));
 
-                let current_dark = view_launcher::config::is_system_dark_mode();
+                let current_dark = tiarun::config::is_system_dark_mode();
                 let ui_w = ui_weak.clone();
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(ui) = ui_w.upgrade() {
@@ -1897,24 +2828,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 11. Run Slint Event Loop
     // The window is first shown as part of `run()` itself (cold start becoming the
     // daemon); schedule the same pop-in transition for that initial appearance too.
-    if let Ok(mut lock) = shown_instant.write() {
-        *lock = Instant::now();
-    }
-    if let Some(ref q) = initial_query {
-        ui.set_search_text(q.clone().into());
-        ui.set_is_expanded(true);
-        ui.invoke_search_text_changed(q.clone().into());
-    }
-    animate_window_pop_in(ui.as_weak());
-    ui.show()?;
-    focus_launcher_window(&ui);
-    ui.invoke_focus_search();
-    let ui_w = ui.as_weak();
-    slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
-        if let Some(ui) = ui_w.upgrade() {
-            ui.invoke_focus_search();
+    if !is_daemon {
+        if let Ok(mut lock) = shown_instant.write() {
+            *lock = Instant::now();
         }
-    });
+        if let Some(ref q) = initial_query {
+            ui.set_search_text(q.clone().into());
+            ui.set_is_expanded(true);
+            ui.invoke_search_text_changed(q.clone().into());
+        }
+        animate_window_pop_in(ui.as_weak());
+        ui.show()?;
+        focus_launcher_window(&ui);
+        ui.invoke_focus_search();
+        let ui_w = ui.as_weak();
+        slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
+            if let Some(ui) = ui_w.upgrade() {
+                ui.invoke_focus_search();
+            }
+        });
+    }
     slint::run_event_loop_until_quit()?;
 
     // Cleanup socket on exit

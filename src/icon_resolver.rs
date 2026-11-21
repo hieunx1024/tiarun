@@ -18,6 +18,10 @@ const SVG_NAVIGATE: &str = r##"<svg viewBox="0 0 24 24" fill="none" xmlns="http:
 const SVG_ENTER: &str = r##"<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 6V13C19 14.1 18.1 15 17 15H6M6 15L10 11M6 15L10 19" stroke="#98989D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 const SVG_SEARCH: &str = r##"<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7" stroke="#dedcd1" stroke-width="2.2"/><path d="M20 20L16 16" stroke="#dedcd1" stroke-width="2.2" stroke-linecap="round"/></svg>"##;
 const SVG_BULB: &str = r##"<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 21h6M10 17h4M12 3a6 6 0 00-6 6c0 2.2 1.2 4.2 3 5.2V16a1 1 0 001 1h4a1 1 0 001-1v-1.8c1.8-1 3-3 3-5.2a6 6 0 00-6-6z" stroke="#FBBF24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
+const SVG_SCOPE_APPS: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>"##;
+const SVG_SCOPE_FILES: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>"##;
+const SVG_SCOPE_TEXT: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>"##;
+const SVG_SCOPE_WINDOWS: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="6" cy="7" r="1" fill="#FFFFFF"/><circle cx="9.5" cy="7" r="1" fill="#FFFFFF"/></svg>"##;
 
 /// High-performance thread-safe icon resolver with O(1) in-memory index and pre-decoding cache.
 pub struct IconResolver {
@@ -420,6 +424,22 @@ impl IconResolver {
 
     pub fn get_folder_icon(&self) -> slint::Image {
         Self::rasterize_svg_bytes(SVG_FOLDER.as_bytes(), 72).unwrap_or_default()
+    }
+
+    pub fn get_scope_apps_icon(&self) -> slint::Image {
+        Self::rasterize_svg_bytes(SVG_SCOPE_APPS.as_bytes(), 48).unwrap_or_default()
+    }
+
+    pub fn get_scope_files_icon(&self) -> slint::Image {
+        Self::rasterize_svg_bytes(SVG_SCOPE_FILES.as_bytes(), 48).unwrap_or_default()
+    }
+
+    pub fn get_scope_text_icon(&self) -> slint::Image {
+        Self::rasterize_svg_bytes(SVG_SCOPE_TEXT.as_bytes(), 48).unwrap_or_default()
+    }
+
+    pub fn get_scope_windows_icon(&self) -> slint::Image {
+        Self::rasterize_svg_bytes(SVG_SCOPE_WINDOWS.as_bytes(), 48).unwrap_or_default()
     }
 
     pub fn rasterize_svg_bytes(svg_data: &[u8], size_px: u32) -> Option<slint::Image> {
@@ -1051,17 +1071,25 @@ mod tests {
         let _ = resolver.get_search_icon();
         let _ = resolver.get_bulb_icon();
         let _ = resolver.get_folder_icon();
+        assert!(resolver.get_scope_apps_icon().size().width > 0);
+        assert!(resolver.get_scope_files_icon().size().width > 0);
+        assert!(resolver.get_scope_text_icon().size().width > 0);
+        assert!(resolver.get_scope_windows_icon().size().width > 0);
 
         // 3. Workspace asset icon resolution
-        let asset_svg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("view-launcher.svg");
-        if asset_svg.exists() {
-            let svg_icon = resolver.resolve_icon(asset_svg.to_str(), "View Launcher", "view-launcher");
+        let asset_svg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("tiarun.svg");
+        let asset_svg_fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("view-launcher.svg");
+        let target_svg = if asset_svg.exists() { asset_svg } else { asset_svg_fallback };
+        if target_svg.exists() {
+            let svg_icon = resolver.resolve_icon(target_svg.to_str(), "TiaRun", "tiarun");
             assert!(svg_icon.is_some(), "Asset SVG should resolve when file exists");
         }
 
-        let asset_png = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("view-launcher.png");
-        if asset_png.exists() {
-            let png_icon = resolver.resolve_icon(asset_png.to_str(), "View Launcher", "view-launcher");
+        let asset_png = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("tiarun.png");
+        let asset_png_fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("view-launcher.png");
+        let target_png = if asset_png.exists() { asset_png } else { asset_png_fallback };
+        if target_png.exists() {
+            let png_icon = resolver.resolve_icon(target_png.to_str(), "TiaRun", "tiarun");
             assert!(png_icon.is_some(), "Asset PNG should resolve when file exists");
         }
 

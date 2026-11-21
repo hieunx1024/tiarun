@@ -1,5 +1,5 @@
-/// Custom Script Plugin System for View Launcher (Rofi-like extensibility).
-/// Loads executable scripts from ~/.config/view-launcher/plugins/ on demand.
+/// Custom Script Plugin System for TiaRun (Rofi-like extensibility).
+/// Loads executable scripts from ~/.config/tiarun/plugins/ on demand.
 
 use std::fs;
 use std::path::PathBuf;
@@ -12,28 +12,34 @@ pub struct PluginInfo {
     pub path: PathBuf,
 }
 
-/// Returns the path to the user plugins directory (~/.config/view-launcher/plugins/)
+/// Returns the path to the user plugins directory (~/.config/tiarun/plugins/)
 pub fn get_plugins_dir() -> PathBuf {
     #[cfg(not(target_os = "windows"))]
     {
-        if let Some(mut p) = dirs::config_dir() {
-            p.push("view-launcher");
-            p.push("plugins");
-            let _ = fs::create_dir_all(&p);
-            return p;
+        if let Some(p) = dirs::config_dir() {
+            let tiarun_plugins = p.join("tiarun").join("plugins");
+            let legacy_plugins = p.join("view-launcher").join("plugins");
+            if !tiarun_plugins.exists() && legacy_plugins.exists() {
+                let _ = fs::rename(&legacy_plugins, &tiarun_plugins);
+            }
+            let _ = fs::create_dir_all(&tiarun_plugins);
+            return tiarun_plugins;
         }
-        PathBuf::from("/tmp/view-launcher-plugins")
+        PathBuf::from("/tmp/tiarun-plugins")
     }
 
     #[cfg(target_os = "windows")]
     {
-        if let Some(mut p) = dirs::config_dir() {
-            p.push("view-launcher");
-            p.push("plugins");
-            let _ = fs::create_dir_all(&p);
-            return p;
+        if let Some(p) = dirs::config_dir() {
+            let tiarun_plugins = p.join("tiarun").join("plugins");
+            let legacy_plugins = p.join("view-launcher").join("plugins");
+            if !tiarun_plugins.exists() && legacy_plugins.exists() {
+                let _ = fs::rename(&legacy_plugins, &tiarun_plugins);
+            }
+            let _ = fs::create_dir_all(&tiarun_plugins);
+            return tiarun_plugins;
         }
-        PathBuf::from(r"C:\ProgramData\view-launcher\plugins")
+        PathBuf::from(r"C:\ProgramData\tiarun\plugins")
     }
 }
 

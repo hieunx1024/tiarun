@@ -43,7 +43,7 @@ pub struct LauncherItem {
     pub description: Option<String>,
     pub terminal: bool,
     pub icon: Option<String>,
-    pub(crate) desktop_categories: Option<std::sync::Arc<str>>,
+    pub desktop_categories: Option<std::sync::Arc<str>>,
 }
 
 impl LauncherItem {
@@ -152,34 +152,41 @@ pub struct LauncherEngine {
     pub clipboard: Arc<crate::clipboard::ClipboardManager>,
     matcher: SkimMatcherV2,
     pub config: Config,
+    pub file_watcher: Option<crate::file_watcher::FileWatcher>,
 }
 
 impl LauncherEngine {
     pub fn new(config: Config) -> Self {
         let history = Arc::new(RwLock::new(HistoryManager::load()));
         let clipboard = Arc::new(crate::clipboard::ClipboardManager::new());
+        let shallow_files = Arc::new(RwLock::new(Vec::new()));
+        let file_watcher = crate::file_watcher::FileWatcher::start(shallow_files.clone(), &config);
+
         let mut engine = Self {
             apps: Vec::new(),
             custom_apps: Vec::new(),
             pinned_apps: config.apps.pinned.clone(),
             hidden_apps: config.apps.hidden.clone(),
-            shallow_files: Arc::new(RwLock::new(Vec::new())),
+            shallow_files,
             history,
             clipboard,
             matcher: SkimMatcherV2::default(),
             config: config.clone(),
+            file_watcher,
         };
 
         // Load custom apps from config
         for custom in &config.apps.custom {
-            engine.custom_apps.push(LauncherItem::new(
+            let mut item = LauncherItem::new(
                 custom.name.clone(),
                 custom.exec.clone(),
                 ItemType::App,
                 custom.description.clone(),
                 custom.terminal,
                 custom.icon.clone(),
-            ));
+            );
+            item.desktop_categories = custom.category.clone().map(Arc::from);
+            engine.custom_apps.push(item);
         }
 
         engine.index_apps();
@@ -195,6 +202,11 @@ impl LauncherEngine {
         });
         
         engine
+    }
+
+    pub fn available_categories(&self) -> Vec<String> {
+        let all_apps: Vec<&LauncherItem> = self.apps.iter().chain(self.custom_apps.iter()).collect();
+        crate::apps::AppCategoryFilter::get_available_categories(all_apps)
     }
 
     /// Indexes all standard Linux .desktop application entries + extra paths from config.
@@ -461,21 +473,77 @@ impl LauncherEngine {
         }
     }
 
-    /// Indexes files based on configured `search.paths` or defaults.
+    /// Indexes files based on configured `search.paths` or smart XDG defaults.
     fn index_files_impl(config: &Config, files: &mut Vec<LauncherItem>) {
+        use std::collections::HashSet;
+
+        const MAX_FILES: usize = 30_000;
+
         let search_paths = if config.search.paths.is_empty() {
-            vec![crate::config::SearchPathConfig {
-                path: "~".to_string(),
-                depth: config.search.max_depth,
-                max_depth: Some(config.search.max_depth),
-                exclude: Vec::new(),
-            }]
+            let mut defaults = Vec::new();
+
+            if let Some(dir) = dirs::document_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 4,
+                    max_depth: Some(4),
+                    exclude: Vec::new(),
+                });
+            }
+
+            if let Some(dir) = dirs::download_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 2,
+                    max_depth: Some(2),
+                    exclude: Vec::new(),
+                });
+            }
+
+            if let Some(dir) = dirs::desktop_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 2,
+                    max_depth: Some(2),
+                    exclude: Vec::new(),
+                });
+            }
+
+            if let Some(dir) = dirs::picture_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 3,
+                    max_depth: Some(3),
+                    exclude: Vec::new(),
+                });
+            }
+
+            if let Some(dir) = dirs::video_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 1,
+                    max_depth: Some(1),
+                    exclude: Vec::new(),
+                });
+            }
+
+            if let Some(dir) = dirs::home_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 1,
+                    max_depth: Some(1),
+                    exclude: Vec::new(),
+                });
+            }
+
+            defaults
         } else {
             config.search.paths.clone()
         };
 
         let ignored_dirs = &config.search.ignored_dirs;
         let ignored_exts = &config.search.ignored_extensions;
+        let mut seen_paths: HashSet<String> = HashSet::new();
 
         for search_entry in search_paths {
             let expanded_path_str = expand_tilde(&search_entry.path);
@@ -498,8 +566,8 @@ impl LauncherEngine {
                 })
                 .flatten()
             {
-                if files.len() >= 5000 {
-                    break;
+                if files.len() >= MAX_FILES {
+                    return;
                 }
                 let path = entry.path();
                 if path == root_path {
@@ -515,6 +583,11 @@ impl LauncherEngine {
                 }
 
                 let path_str = path.to_string_lossy().to_string();
+
+                if !seen_paths.insert(path_str.clone()) {
+                    continue;
+                }
+
                 let name = entry.file_name().to_string_lossy().to_string();
                 
                 let item_type = if entry.file_type().is_dir() {
@@ -700,6 +773,14 @@ impl LauncherEngine {
     /// Mặc định: Chỉ tìm ứng dụng & tính toán (cực nhanh, không lẫn file).
     /// Khi bắt đầu bằng `@f ` hoặc `@file `: Chuyển sang chế độ tìm kiếm file & thư mục.
     pub fn search(&self, query: &str) -> Vec<(LauncherItem, Vec<usize>)> {
+        self.search_until_cancelled(query, &|| false)
+    }
+
+    pub fn search_until_cancelled(
+        &self,
+        query: &str,
+        cancelled: &(impl Fn() -> bool + Sync),
+    ) -> Vec<(LauncherItem, Vec<usize>)> {
         let trimmed_query = query.trim();
         let query_normalized = remove_vietnamese_accents(trimmed_query);
         let shallow_files_guard = self.shallow_files.read().unwrap_or_else(|e| e.into_inner());
@@ -732,20 +813,22 @@ impl LauncherEngine {
         if trimmed_query == "?" {
             let shortcuts: &[(&str, &str)] = &[
                 ("Ctrl+Alt+Space", "Toggle the launcher window (global shortcut)"),
+                ("F1 / ?", "Show this keyboard shortcuts & help cheatsheet"),
+                ("Tab", "Cycle search scope loop (Apps ➔ Files ➔ Text ➔ Windows)"),
+                ("→ / Right", "Browse into selected folder"),
                 ("Enter", "Open / run / copy the selected result"),
                 ("Up / Down", "Navigate results (or recall past \"!\" commands in shell mode)"),
-                ("Tab", "Enter the selected folder (file search mode)"),
                 ("Backspace", "Delete character; at root, go to parent folder"),
                 ("Alt+T", "Open the selected item's folder in a terminal"),
                 ("Alt+C", "Copy file path or result to clipboard"),
                 ("Ctrl+,", "Open preferences"),
                 ("Esc", "Close preferences, or hide the launcher"),
                 ("@f <query>", "Search files and folders"),
+                ("@t <query>", "Search text inside files & docs (@t, @content, @grep)"),
                 ("@w <query>", "Switch between open windows"),
                 ("@c <query>", "Browse clipboard history"),
                 ("@sys", "Lock, sleep, restart, shutdown"),
                 ("@theme", "Switch theme mode / opacity"),
-                ("@emoji or :name", "Search emoji (English or Vietnamese)"),
                 ("! <command>", "Run a shell command in a terminal"),
                 ("5 * 12, 0xFF, ...", "Inline calculator (also unit/currency conversion)"),
                 ("anything else", "Search apps; falls back to a web search"),
@@ -840,8 +923,10 @@ impl LauncherEngine {
             let history = self.clipboard.get_history();
             let items: Vec<LauncherItem> = history.into_iter().map(|text| {
                 let one_line = text.lines().next().unwrap_or("").trim().to_string();
-                let snippet = if one_line.len() > 70 {
-                    format!("{}...", &one_line[..70])
+                let char_count = one_line.chars().count();
+                let snippet = if char_count > 70 {
+                    let truncated: String = one_line.chars().take(70).collect();
+                    format!("{}...", truncated)
                 } else if one_line.is_empty() {
                     "Clipboard text".to_string()
                 } else {
@@ -973,6 +1058,9 @@ impl LauncherEngine {
                 let mut matched: Vec<((LauncherItem, Vec<usize>), i64)> = dir_items
                     .par_iter()
                     .filter_map(|item| {
+                        if cancelled() {
+                            return None;
+                        }
                         let match_res = self.match_precomputed(
                             &item.name,
                             &item.normalized_name,
@@ -982,7 +1070,12 @@ impl LauncherEngine {
                         let final_res = if match_res.is_some() {
                             match_res
                         } else if enable_path_matching {
-                            self.match_item(&item.exec_or_path, &filter)
+                            self.match_precomputed(
+                                &item.exec_or_path,
+                                &remove_vietnamese_accents(&item.exec_or_path),
+                                &filter,
+                                &filter_normalized,
+                            )
                         } else {
                             None
                         };
@@ -1003,6 +1096,9 @@ impl LauncherEngine {
             let mut matches: Vec<((LauncherItem, Vec<usize>), i64)> = shallow_files_guard
                 .par_iter()
                 .filter_map(|file| {
+                    if cancelled() {
+                        return None;
+                    }
                     let match_res = self.match_precomputed(
                         &file.name,
                         &file.normalized_name,
@@ -1012,7 +1108,12 @@ impl LauncherEngine {
                     let final_res = if match_res.is_some() {
                         match_res
                     } else if enable_path_matching {
-                        self.match_item(&file.exec_or_path, file_query)
+                        self.match_precomputed(
+                            &file.exec_or_path,
+                            &remove_vietnamese_accents(&file.exec_or_path),
+                            file_query,
+                            &file_query_normalized,
+                        )
                     } else {
                         None
                     };
@@ -1031,31 +1132,63 @@ impl LauncherEngine {
             return results;
         }
 
-        // 5. Chế độ tìm kiếm Emoji (@emoji, @e, hoặc bắt đầu bằng dấu ':')
-        let is_emoji_mode = trimmed_query.starts_with("@emoji")
-            || trimmed_query.starts_with("@e ")
-            || trimmed_query == "@e"
-            || trimmed_query.starts_with(':');
+        // 4.5 File Content Search Mode (@t, @content, @text, @grep, @fc)
+        let is_content_mode = trimmed_query.starts_with("@content")
+            || trimmed_query.starts_with("@text")
+            || trimmed_query.starts_with("@grep")
+            || trimmed_query.starts_with("@fc")
+            || trimmed_query.starts_with("@t ")
+            || trimmed_query == "@t";
 
-        if is_emoji_mode {
-            let emoji_query = if trimmed_query.starts_with("@emoji ") {
-                trimmed_query[7..].trim()
-            } else if trimmed_query.starts_with("@e ") {
+        if is_content_mode {
+            let content_query = if trimmed_query.starts_with("@content ") {
+                trimmed_query[9..].trim()
+            } else if trimmed_query.starts_with("@text ") {
+                trimmed_query[6..].trim()
+            } else if trimmed_query.starts_with("@grep ") {
+                trimmed_query[6..].trim()
+            } else if trimmed_query.starts_with("@fc ") {
+                trimmed_query[4..].trim()
+            } else if trimmed_query.starts_with("@t ") {
                 trimmed_query[3..].trim()
-            } else if trimmed_query.starts_with(':') {
-                trimmed_query[1..].trim().trim_end_matches(':')
             } else {
                 ""
             };
-            let emoji_items = crate::emoji::search_emojis(emoji_query);
-            for item in emoji_items {
+
+            if content_query.is_empty() {
+                results.push((
+                    LauncherItem::new(
+                        "File Content Search".to_string(),
+                        "@t".to_string(),
+                        ItemType::Calc,
+                        Some("Search text inside files & docs, e.g. @t hợp đồng 2026".to_string()),
+                        false,
+                        Some("text-x-generic".to_string()),
+                    ),
+                    Vec::new(),
+                ));
+                return results;
+            }
+
+            drop(shallow_files_guard);
+            drop(history_guard);
+            let matches = crate::content_search::ContentSearchEngine::search_until_cancelled(
+                content_query,
+                &self.config,
+                self.config.search.max_results,
+                cancelled,
+            );
+
+            for m in matches {
+                let item = crate::content_search::ContentSearchEngine::match_to_launcher_item(&m);
                 results.push((item, Vec::new()));
             }
+
             return results;
         }
 
-        // 6. Chế độ Custom Script Plugins (~/.config/view-launcher/plugins/)
-        if trimmed_query.starts_with('@') && !is_win_mode && !is_clip_mode && !is_sys_mode && !is_file_mode && !is_emoji_mode {
+        // 5. Chế độ Custom Script Plugins (~/.config/tiarun/plugins/)
+        if trimmed_query.starts_with('@') && !is_win_mode && !is_clip_mode && !is_sys_mode && !is_file_mode {
             let plugins = crate::plugins::discover_plugins();
             let after_at = &trimmed_query[1..];
             let mut parts = after_at.splitn(2, ' ');
@@ -1116,12 +1249,12 @@ impl LauncherEngine {
                 ));
                 results.push((
                     LauncherItem::new(
-                        "@emoji - Emoji Picker".to_string(),
-                        "@emoji".to_string(),
+                        "@t - File Content Search".to_string(),
+                        "@t".to_string(),
                         ItemType::Calc,
-                        Some("Search emojis in English or Vietnamese (:fire)".to_string()),
+                        Some("Search text inside files & documents (@t, @content)".to_string()),
                         false,
-                        None,
+                        Some("text-x-generic".to_string()),
                     ),
                     Vec::new(),
                 ));
@@ -1440,7 +1573,9 @@ impl LauncherEngine {
         query_normalized: &str,
     ) -> Option<(i64, Vec<usize>)> {
         let (score_orig, indices_orig) = self.matcher.fuzzy_indices(name, query).unwrap_or((0, Vec::new()));
-        let (score_accent, indices_accent) = if !query_normalized.is_empty() {
+        let (score_accent, indices_accent) = if !query_normalized.is_empty()
+            && (name != name_normalized || query != query_normalized)
+        {
             self.matcher.fuzzy_indices(name_normalized, query_normalized).unwrap_or((0, Vec::new()))
         } else {
             (0, Vec::new())
@@ -1738,9 +1873,149 @@ impl LauncherEngine {
             }
         }
     }
+
+    /// Copies an image's raw pixels, or file URI/path to clipboard.
+    pub fn copy_file_or_image(&self, path_str: &str) {
+        let path = Path::new(path_str);
+        let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let canonical_str = canonical.to_string_lossy().to_string();
+        let ext = canonical.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let is_image = matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "bmp" | "ico");
+
+        if is_image && canonical.exists() {
+            // On Linux (Wayland / X11), native clipboard tools like wl-copy and xclip
+            // keep the image alive persistently in the desktop clipboard.
+            // Arboard on Linux drops its X11 window almost immediately when dropped,
+            // and has no native Wayland clipboard support.
+            #[cfg(all(unix, not(target_os = "macos")))]
+            {
+                use std::io::Write;
+                let png_bytes: Option<Vec<u8>> = if ext == "png" {
+                    fs::read(&canonical).ok()
+                } else if let Ok(img) = image::open(&canonical) {
+                    let mut buf = Vec::new();
+                    if img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png).is_ok() {
+                        Some(buf)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(bytes) = png_bytes {
+                    let mut copied = false;
+                    // 1. Wayland wl-copy
+                    if let Ok(mut child) = Command::new("wl-copy")
+                        .args(&["-t", "image/png"])
+                        .stdin(std::process::Stdio::piped())
+                        .spawn()
+                    {
+                        if let Some(mut stdin) = child.stdin.take() {
+                            let _ = stdin.write_all(&bytes);
+                        }
+                        if let Ok(status) = child.wait() {
+                            if status.success() {
+                                copied = true;
+                            }
+                        }
+                    }
+
+                    // 2. X11 xclip fallback
+                    if !copied {
+                        if let Ok(mut child) = Command::new("xclip")
+                            .args(&["-selection", "clipboard", "-t", "image/png"])
+                            .stdin(std::process::Stdio::piped())
+                            .spawn()
+                        {
+                            if let Some(mut stdin) = child.stdin.take() {
+                                let _ = stdin.write_all(&bytes);
+                            }
+                            if let Ok(status) = child.wait() {
+                                if status.success() {
+                                    copied = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if copied {
+                        return;
+                    }
+                }
+            }
+
+            // Cross-platform / Windows / macOS / fallback: use arboard
+            if let Ok(img) = image::open(&canonical) {
+                let rgba = img.to_rgba8();
+                let (w, h) = rgba.dimensions();
+                let img_data = arboard::ImageData {
+                    width: w as usize,
+                    height: h as usize,
+                    bytes: std::borrow::Cow::Borrowed(rgba.as_raw()),
+                };
+
+                if let Ok(mut cb) = arboard::Clipboard::new() {
+                    if cb.set_image(img_data).is_ok() {
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 2. If it's a file or directory, copy file URI on Linux Wayland so File Managers can paste file
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            use std::io::Write;
+            let uri = format!("file://{}\r\n", canonical_str);
+            if let Ok(mut child) = Command::new("wl-copy")
+                .args(&["-t", "text/uri-list"])
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+            {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(uri.as_bytes());
+                }
+                if let Ok(status) = child.wait() {
+                    if status.success() {
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback: Copy path string to clipboard
+        self.copy_to_clipboard(&canonical_str);
+    }
+
+    /// Smart copy: copies image pixels for images, file URI for files, result for calculator, etc.
+    pub fn copy_item_smart(&self, item: &LauncherItem) {
+        match item.item_type {
+            ItemType::File | ItemType::Dir => {
+                self.copy_file_or_image(&item.exec_or_path);
+            }
+            ItemType::Calc => {
+                if let Some(res) = item.description.as_ref() {
+                    self.copy_to_clipboard(res);
+                } else {
+                    self.copy_to_clipboard(&item.name);
+                }
+            }
+            ItemType::Clipboard => {
+                self.copy_to_clipboard(&item.name);
+            }
+            _ => {
+                if !item.exec_or_path.is_empty() {
+                    self.copy_to_clipboard(&item.exec_or_path);
+                } else {
+                    self.copy_to_clipboard(&item.name);
+                }
+            }
+        }
+    }
 }
 
-fn expand_tilde(path_str: &str) -> String {
+pub(crate) fn expand_tilde(path_str: &str) -> String {
     if path_str.starts_with("~/") {
         if let Some(home) = dirs::home_dir() {
             return path_str.replacen("~/", &format!("{}/", home.to_string_lossy()), 1);
@@ -1867,6 +2142,9 @@ fn url_encode_query(input: &str) -> String {
 }
 
 pub fn remove_vietnamese_accents(s: &str) -> String {
+    if s.is_ascii() {
+        return s.to_ascii_lowercase();
+    }
     s.chars().map(|c| {
         match c {
             'á' | 'à' | 'ả' | 'ã' | 'ạ' | 'ă' | 'ắ' | 'ằ' | 'ẳ' | 'ẵ' | 'ặ' | 'â' | 'ấ' | 'ầ' | 'ẩ' | 'ẫ' | 'ậ' |
@@ -1955,6 +2233,40 @@ pub fn parse_command_line(cmd: &str) -> Vec<String> {
     args
 }
 
+/// Extracts a clean, user-friendly executable path or name from a raw exec command.
+/// Strips out `env`, environment variables (`VAR=val`), placeholders (`%U`, `%f`),
+/// and unwraps `flatpak run` commands.
+pub fn clean_app_exec(raw: &str) -> String {
+    let tokens = parse_command_line(raw);
+    let mut meaningful = Vec::new();
+    let mut in_env = false;
+    for (i, t) in tokens.iter().enumerate() {
+        if i == 0 && t == "env" {
+            in_env = true;
+            continue;
+        }
+        if in_env && t.contains('=') {
+            continue;
+        }
+        in_env = false;
+        if t.starts_with('%') || t == "--" {
+            continue;
+        }
+        meaningful.push(t.as_str());
+    }
+
+    if meaningful.is_empty() {
+        return raw.to_string();
+    }
+
+    // Flatpak app ID formatting
+    if meaningful.len() >= 3 && meaningful[0] == "flatpak" && meaningful[1] == "run" {
+        return format!("flatpak: {}", meaningful[2]);
+    }
+
+    meaningful[0].to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1996,6 +2308,23 @@ mod tests {
     }
 
     #[test]
+    fn test_clean_app_exec() {
+        assert_eq!(
+            clean_app_exec(r#"env GTK_IM_MODULE=ibus XMODIFIERS=@im=ibus IBUS_ENABLE_SYNC_MODE=1 "/opt/idea/bin/idea.sh" %f"#),
+            "/opt/idea/bin/idea.sh"
+        );
+        assert_eq!(
+            clean_app_exec("/usr/bin/google-chrome-stable %U"),
+            "/usr/bin/google-chrome-stable"
+        );
+        assert_eq!(
+            clean_app_exec("flatpak run com.spotify.Client"),
+            "flatpak: com.spotify.Client"
+        );
+        assert_eq!(clean_app_exec("alacritty"), "alacritty");
+    }
+
+    #[test]
     #[cfg(not(target_os = "windows"))]
     fn test_parse_idea_desktop() {
         let path = Path::new("/usr/share/applications/idea.desktop");
@@ -2025,7 +2354,7 @@ mod tests {
     #[cfg(not(target_os = "windows"))]
     fn test_desktop_entry_precedence() {
         use std::io::Write;
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_test_prec_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_test_prec_{}", std::process::id()));
         let user_dir = temp_dir.join("user");
         let sys_dir = temp_dir.join("sys");
         let _ = fs::create_dir_all(&user_dir);
@@ -2245,20 +2574,6 @@ mod tests {
     }
 
     #[test]
-    fn test_emoji_search() {
-        let config = Config::default();
-        let engine = LauncherEngine::new(config);
-        
-        let e1 = engine.search("@emoji fire");
-        assert!(!e1.is_empty());
-        assert!(e1.iter().any(|(item, _)| item.name.contains("🔥")));
-
-        let e2 = engine.search(":rocket");
-        assert!(!e2.is_empty());
-        assert!(e2.iter().any(|(item, _)| item.name.contains("🚀")));
-    }
-
-    #[test]
     fn test_unit_and_currency_search() {
         let config = Config::default();
         let engine = LauncherEngine::new(config);
@@ -2282,7 +2597,7 @@ mod tests {
         assert!(modes.iter().any(|(item, _)| item.name.contains("@w")));
         assert!(modes.iter().any(|(item, _)| item.name.contains("@c")));
         assert!(modes.iter().any(|(item, _)| item.name.contains("@sys")));
-        assert!(modes.iter().any(|(item, _)| item.name.contains("@emoji")));
+        assert!(modes.iter().any(|(item, _)| item.name.contains("@theme")));
     }
 
     #[test]
@@ -2375,6 +2690,102 @@ mod tests {
     fn test_system_dark_mode_live() {
         let is_dark = crate::config::is_system_dark_mode();
         println!(">>> Current is_system_dark_mode(): {}", is_dark);
+    }
+
+    #[test]
+    fn test_smart_file_indexing_and_ignore_rules() {
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let docs_dir = temp_dir.join("Documents").join("Reports").join("2026");
+        let node_modules = temp_dir.join("node_modules");
+        let _ = std::fs::create_dir_all(&docs_dir);
+        let _ = std::fs::create_dir_all(&node_modules);
+
+        let valid_file = docs_dir.join("annual_report.docx");
+        let ignored_ext_file = docs_dir.join("debug.log");
+        let ignored_dir_file = node_modules.join("package.json");
+
+        let _ = std::fs::write(&valid_file, "report content");
+        let _ = std::fs::write(&ignored_ext_file, "some log");
+        let _ = std::fs::write(&ignored_dir_file, "{}");
+
+        let mut config = Config::default();
+        config.search.paths = vec![crate::config::SearchPathConfig {
+            path: temp_dir.to_string_lossy().to_string(),
+            depth: 4,
+            max_depth: Some(4),
+            exclude: Vec::new(),
+        }];
+
+        let mut files = Vec::new();
+        LauncherEngine::index_files_impl(&config, &mut files);
+
+        assert!(files.iter().any(|f| f.name == "annual_report.docx"), "Should find nested annual_report.docx");
+        assert!(!files.iter().any(|f| f.name == "debug.log"), "Should ignore .log extension by default");
+        assert!(!files.iter().any(|f| f.name == "package.json"), "Should ignore files inside node_modules by default");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_content_search_integration() {
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_content_int_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let doc = temp_dir.join("meeting_notes.txt");
+        let _ = std::fs::write(&doc, "Agenda item 1: Discuss quarterly roadmap and target goals for 2026.");
+
+        let mut config = Config::default();
+        config.search.paths = vec![crate::config::SearchPathConfig {
+            path: temp_dir.to_string_lossy().to_string(),
+            depth: 2,
+            max_depth: Some(2),
+            exclude: Vec::new(),
+        }];
+
+        let engine = LauncherEngine::new(config);
+        let results = engine.search("@content roadmap");
+        assert!(!results.is_empty(), "Should find file matching content query");
+        assert_eq!(results[0].0.name, "meeting_notes.txt");
+        assert!(results[0].0.description.as_ref().unwrap().contains("roadmap"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_smart_copy_item() {
+        let config = Config::default();
+        let engine = LauncherEngine::new(config);
+
+        let calc_item = LauncherItem::new(
+            "42".to_string(),
+            "42".to_string(),
+            ItemType::Calc,
+            Some("42".to_string()),
+            false,
+            None,
+        );
+        engine.copy_item_smart(&calc_item);
+
+        let file_item = LauncherItem::new(
+            "tiarun.png".to_string(),
+            "assets/tiarun.png".to_string(),
+            ItemType::File,
+            None,
+            false,
+            None,
+        );
+        engine.copy_item_smart(&file_item);
+
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            if std::env::var("WAYLAND_DISPLAY").is_ok() {
+                let out = std::process::Command::new("wl-paste").arg("--list-types").output().expect("wl-paste failed");
+                let types = String::from_utf8_lossy(&out.stdout);
+                assert!(types.contains("image/png"), "Expected image/png in clipboard types, got: {}", types);
+            }
+        }
     }
 }
 

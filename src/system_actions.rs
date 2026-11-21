@@ -96,8 +96,8 @@ pub fn execute_system_action(command: &str) {
         let tokens: Vec<&str> = command.split_whitespace().collect();
         if !tokens.is_empty() {
             match std::process::Command::new(tokens[0]).args(&tokens[1..]).spawn() {
-                Ok(_) => eprintln!("[view-launcher] system action spawned: {command}"),
-                Err(e) => eprintln!("[view-launcher] system action FAILED to spawn: {command}: {e}"),
+                Ok(_) => eprintln!("[tiarun] system action spawned: {command}"),
+                Err(e) => eprintln!("[tiarun] system action FAILED to spawn: {command}: {e}"),
             }
         }
     }

@@ -1,17 +1,17 @@
 # Maintainer: Hieu Nguyen <hieunx@outlook.com>
-pkgname=view-launcher-git
-_pkgname=view-launcher
+pkgname=tiarun-git
+_pkgname=tiarun
 pkgver=r4.7a1b2c3
 pkgrel=1
-pkgdesc="A minimalist, high-performance terminal TUI app & file launcher in Rust for Sway/Wayland/X11"
+pkgdesc="Think. Search. Run. - High-performance desktop launcher in Rust (<5ms)"
 arch=('x86_64')
-url="https://github.com/hieunx1024/view-launcher"
+url="https://github.com/hieunx1024/tiarun"
 license=('MIT')
 depends=('gcc-libs')
 makedepends=('cargo' 'git')
-provides=('view-launcher')
-conflicts=('view-launcher')
-source=("git+https://github.com/hieunx1024/view-launcher.git")
+provides=('tiarun' 'view-launcher')
+conflicts=('tiarun' 'view-launcher')
+source=("git+https://github.com/hieunx1024/tiarun.git")
 sha256sums=('SKIP')
 
 pkgver() {

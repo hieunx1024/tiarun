@@ -101,8 +101,8 @@ pub fn detect_blur_backend(_win: &Window) -> (Box<dyn BlurBackend>, BlurStatus, 
     }
 
     if is_sway {
-        println!("[view-launcher] Vanilla Sway does not support backdrop blur (use SwayFX for compositor blur).");
-        println!("[view-launcher] Activating Tier 4 Fallback: high-opacity frosted glass (~95% opacity).");
+        println!("[tiarun] Vanilla Sway does not support backdrop blur (use SwayFX for compositor blur).");
+        println!("[tiarun] Activating Tier 4 Fallback: high-opacity frosted glass (~95% opacity).");
     }
 
     // Tier 4: GNOME / Mutter / unknown -> Fallback
@@ -149,14 +149,14 @@ fn is_swayfx() -> bool {
 
 fn print_tier3_compositor_rules(is_hyprland: bool) {
     if is_hyprland {
-        println!("[view-launcher] Hyprland blur rules (add to ~/.config/hypr/hyprland.conf):");
-        println!("  windowrulev2 = blur, class:^(view-launcher)$");
-        println!("  windowrulev2 = ignorealpha 0.2, class:^(view-launcher)$");
-        println!("  windowrulev2 = float, class:^(view-launcher)$");
-        println!("  windowrulev2 = center, class:^(view-launcher)$");
-        println!("  windowrulev2 = noshadow, class:^(view-launcher)$");
+        println!("[tiarun] Hyprland blur rules (add to ~/.config/hypr/hyprland.conf):");
+        println!("  windowrulev2 = blur, class:^(tiarun)$");
+        println!("  windowrulev2 = ignorealpha 0.2, class:^(tiarun)$");
+        println!("  windowrulev2 = float, class:^(tiarun)$");
+        println!("  windowrulev2 = center, class:^(tiarun)$");
+        println!("  windowrulev2 = noshadow, class:^(tiarun)$");
     } else {
-        println!("[view-launcher] SwayFX blur rules (add to ~/.config/sway/config):");
-        println!("  for_window [app_id=\"view-launcher\"] blur enable, floating enable");
+        println!("[tiarun] SwayFX blur rules (add to ~/.config/sway/config):");
+        println!("  for_window [app_id=\"tiarun\"] blur enable, floating enable");
     }
 }

@@ -11,6 +11,7 @@ export struct LauncherItemData {
     has_icon: bool,
     icon: image,
     exec_or_path: string,
+    subtitle: string,
 }
 
 export component LiquidGlassLauncher inherits Rectangle {
@@ -26,19 +27,44 @@ export component LiquidGlassLauncher inherits Rectangle {
     in property <bool> is_expanded: false;
     in-out property <string> active_category: "";
     in property <bool> categories_enabled: true;
-    property <[string]> categories: ["Calendar", "Applications", "Actions", "Messages", "Help", "Mail", "Settings", "Contacts"];
+    in property <[string]> categories: ["Applications", "Development", "Browser", "Media", "Office", "System", "Actions"];
+    in-out property <string> active_scope: "apps";
+    in property <image> scope_apps_icon;
+    in property <image> scope_files_icon;
+    in property <image> scope_text_icon;
+    in property <image> scope_windows_icon;
+    in property <string> action_hint_text: "";
+    in property <string> action_item_count: "";
+    in property <bool> cfg_show_status_bar: true;
     in property <bool> is_pop_visible: true;
+    in property <bool> show_preview: false;
+    in property <string> preview_title: "";
+    in property <string> preview_type: "none";
+    in property <string> preview_lang: "";
+    in property <string> preview_text: "";
+    in property <string> preview_file_size: "";
+    in property <string> preview_file_modified: "";
+    in property <string> preview_file_location: "";
+    in property <image> preview_image;
 
     callback search_text_changed(string);
     callback item_activated(int);
     callback move_up();
     callback move_down();
     callback tab_pressed();
+    callback backtab_pressed();
+    callback right_arrow_pressed() -> bool;
+    callback left_arrow_pressed() -> bool;
     callback backspace_pressed() -> bool;
     callback close_launcher();
     callback open_settings();
     callback start_window_drag();
     callback chip_selected(string);
+    callback scope_selected(string);
+    callback f1_pressed();
+    callback ctrl_number_pressed(int);
+    callback copy_item(int);
+    callback copy_path(int);
 
     public function focus_search() {
         pill_input.focus_input();
@@ -52,6 +78,9 @@ export component LiquidGlassLauncher inherits Rectangle {
     function select_category(index: int) {
         root.category_index = index;
         root.active_category = index < 0 ? "" : root.categories[index];
+        if (index >= 0) {
+            root.search_text = "";
+        }
         root.chip_selected(root.active_category);
     }
 
@@ -61,16 +90,26 @@ export component LiquidGlassLauncher inherits Rectangle {
 
     width: 100%;
     background: transparent;
-    border-radius: root.is_expanded ? Theme.panel_radius : Theme.pill_radius;
+    property <length> panel_radius: root.is_expanded ? Theme.panel_radius : Theme.pill_radius;
     clip: true;
     opacity: root.is_pop_visible ? 1.0 : 0.0;
     animate opacity { duration: root.is_pop_visible ? 160ms : 0ms; easing: ease-out; }
-    animate border-radius { duration: Theme.anim_expand; easing: cubic-bezier(0.2, 0.8, 0.2, 1.0); }
+    animate panel_radius { duration: Theme.anim_expand; easing: cubic-bezier(0.2, 0.8, 0.2, 1.0); }
 
-    GlassPanel {
-        panel_radius: root.border-radius;
-        is_expanded: root.is_expanded;
-    }
+    launcher_scope := FocusScope {
+        width: 100%;
+        height: 100%;
+        key-pressed(event) => {
+            if (event.text == Key.Escape || event.text == "\u{001b}") {
+                root.close_launcher();
+                return accept;
+            }
+            return reject;
+        }
+
+        GlassPanel {
+            panel_radius: root.panel_radius;
+        }
 
     // Search Header (Fixed 48px)
     header_box := Rectangle {
@@ -84,7 +123,7 @@ export component LiquidGlassLauncher inherits Rectangle {
                 horizontal-stretch: 1;
                 text <=> root.search_text;
                 search_icon: root.search_icon;
-                placeholder: "Spotlight Search";
+                placeholder: "Search";
 
                 edited(txt) => {
                     root.search_text_changed(txt);
@@ -99,11 +138,19 @@ export component LiquidGlassLauncher inherits Rectangle {
                     root.move_down();
                 }
                 tab_pressed => {
-                    if (chips_bar.visible) {
-                        root.cycle_chip();
-                    } else {
-                        root.tab_pressed();
-                    }
+                    root.tab_pressed();
+                }
+                backtab_pressed => {
+                    root.backtab_pressed();
+                }
+                right_arrow_pressed => {
+                    return root.right_arrow_pressed();
+                }
+                left_arrow_pressed => {
+                    return root.left_arrow_pressed();
+                }
+                f1_pressed => {
+                    root.f1_pressed();
                 }
                 backspace_pressed => {
                     return root.backspace_pressed();
@@ -113,6 +160,12 @@ export component LiquidGlassLauncher inherits Rectangle {
                 }
                 escape_pressed => {
                     root.close_launcher();
+                }
+                copy_item => {
+                    root.copy_item(root.selected_index);
+                }
+                copy_path => {
+                    root.copy_path(root.selected_index);
                 }
             }
 
@@ -153,9 +206,9 @@ export component LiquidGlassLauncher inherits Rectangle {
         }
     }
 
-    // Chips Bar (Fixed 36px, visible when expanded)
+    // Scope Filter Chips Bar (Visible when expanded)
     chips_bar := Rectangle {
-        visible: root.is_expanded && root.categories_enabled;
+        visible: root.is_expanded;
         x: 0px;
         y: header_box.height;
         width: parent.width;
@@ -167,14 +220,46 @@ export component LiquidGlassLauncher inherits Rectangle {
             height: 100%;
             padding-left: Theme.content_inset;
             padding-right: Theme.content_inset;
-            spacing: Theme.chip_gap;
             alignment: start;
+            spacing: 8px;
 
-            for category[index] in root.categories: CategoryChip {
-                text: category;
-                active: root.active_category == category;
+            CategoryChip {
+                icon: root.scope_apps_icon;
+                has_icon: true;
+                text: "Apps";
+                active: root.active_scope == "apps";
                 clicked => {
-                    root.select_category(root.active_category == category ? -1 : index);
+                    root.scope_selected("apps");
+                    root.focus_search();
+                }
+            }
+            CategoryChip {
+                icon: root.scope_files_icon;
+                has_icon: true;
+                text: "Files";
+                active: root.active_scope == "files";
+                clicked => {
+                    root.scope_selected("files");
+                    root.focus_search();
+                }
+            }
+            CategoryChip {
+                icon: root.scope_text_icon;
+                has_icon: true;
+                text: "Text";
+                active: root.active_scope == "text";
+                clicked => {
+                    root.scope_selected("text");
+                    root.focus_search();
+                }
+            }
+            CategoryChip {
+                icon: root.scope_windows_icon;
+                has_icon: true;
+                text: "Windows";
+                active: root.active_scope == "windows";
+                clicked => {
+                    root.scope_selected("windows");
                     root.focus_search();
                 }
             }
@@ -187,37 +272,217 @@ export component LiquidGlassLauncher inherits Rectangle {
         x: 0px;
         y: chips_bar.y + chips_bar.height;
         width: parent.width;
-        height: Math.max(0px, parent.height - self.y);
+        height: Math.max(0px, parent.height - self.y - (footer_bar.visible ? footer_bar.height : 0px));
         clip: true;
 
-        results_scroll := Flickable {
+        HorizontalLayout {
             width: 100%;
             height: 100%;
-            visible: root.has_results;
-            viewport-y <=> root.scroll_viewport_y;
-            viewport-height: Math.max(self.height, root.items.length * (Theme.row_height + Theme.row_gap)
-                - Theme.row_gap + 2 * Theme.panel_padding);
 
-            VerticalLayout {
-                width: 100%;
-                padding: Theme.panel_padding;
-                spacing: Theme.row_gap;
-                alignment: start;
+            results_scroll := Flickable {
+                horizontal-stretch: 1;
+                height: 100%;
+                visible: root.has_results;
+                viewport-y <=> root.scroll_viewport_y;
+                viewport-height: Math.max(self.height, root.items.length * (Theme.row_height + Theme.row_gap)
+                    - Theme.row_gap + 2 * Theme.panel_padding);
 
-                for item[i] in root.items: ResultRow {
-                    title: item.name;
-                    subtitle: item.exec_or_path;
-                    meta: item.category;
-                    has_icon: item.has_icon;
-                    icon: item.icon;
-                    selected: i == root.selected_index;
+                VerticalLayout {
+                    width: 100%;
+                    padding: Theme.panel_padding;
+                    spacing: Theme.row_gap;
+                    alignment: start;
 
-                    activated => {
-                        root.selected_index = i;
-                        root.item_activated(i);
+                    for item[i] in root.items: ResultRow {
+                        title: item.name;
+                        subtitle: item.subtitle;
+                        meta: item.category;
+                        has_icon: item.has_icon;
+                        icon: item.icon;
+                        selected: i == root.selected_index;
+
+                        activated => {
+                            root.selected_index = i;
+                            root.item_activated(i);
+                        }
+                        hovered => {
+                            root.selected_index = i;
+                        }
                     }
-                    hovered => {
-                        root.selected_index = i;
+                }
+            }
+
+            if (root.show_preview && root.has_results) : Rectangle {
+                width: 1px;
+                background: Theme.dark ? rgba(255, 255, 255, 0.08) : rgba(0, 0, 0, 0.08);
+            }
+
+            if (root.show_preview && root.has_results) : Rectangle {
+                width: Theme.preview_pane_width;
+                background: Theme.dark ? rgba(0, 0, 0, 0.22) : rgba(255, 255, 255, 0.35);
+                border-radius: Theme.panel_radius;
+                clip: true;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 8px;
+
+                    // Preview Title
+                    Text {
+                        text: root.preview_title;
+                        font-family: Theme.font_family;
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: Theme.text_primary;
+                        overflow: elide;
+                    }
+
+                    if (root.preview_file_location != "") : Text {
+                        text: root.preview_file_location;
+                        font-family: Theme.font_family;
+                        font-size: 12px;
+                        color: Theme.text_secondary;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Theme.dark ? rgba(255, 255, 255, 0.08) : rgba(0, 0, 0, 0.08);
+                    }
+
+                    // 1. Image Preview
+                    if (root.preview_type == "image") : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.dark ? rgba(0, 0, 0, 0.2) : rgba(255, 255, 255, 0.35);
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: Theme.dark ? rgba(255, 255, 255, 0.05) : rgba(0, 0, 0, 0.05);
+                        clip: true;
+                        VerticalLayout {
+                            alignment: center;
+                            padding: 8px;
+                            Image {
+                                source: root.preview_image;
+                                max-width: 500px;
+                                max-height: 380px;
+                                image-fit: contain;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 2. Text Snippet Preview
+                    if (root.preview_type == "text") : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.dark ? rgba(0, 0, 0, 0.25) : rgba(255, 255, 255, 0.45);
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: Theme.dark ? rgba(255, 255, 255, 0.06) : rgba(0, 0, 0, 0.06);
+                        clip: true;
+
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 8px;
+                            alignment: start;
+
+                            if (root.preview_lang != "") : HorizontalLayout {
+                                alignment: end;
+                                Rectangle {
+                                    background: Theme.dark ? rgba(255, 255, 255, 0.12) : rgba(0, 0, 0, 0.08);
+                                    border-radius: 4px;
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        padding-top: 3px;
+                                        padding-bottom: 3px;
+                                        Text {
+                                            text: root.preview_lang;
+                                            font-family: "monospace";
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            color: Theme.dark ? #88c0d0 : #0066cc;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Flickable {
+                                vertical-stretch: 1;
+                                interactive: true;
+                                viewport-height: preview_text_layout.preferred-height;
+
+                                preview_text_layout := VerticalLayout {
+                                    x: 0px;
+                                    y: 0px;
+                                    width: 100%;
+                                    alignment: start;
+
+                                    Text {
+                                        text: root.preview_text;
+                                        font-family: "monospace";
+                                        font-size: 13.5px;
+                                        color: Theme.dark ? #d8dee9 : #2e3440;
+                                        wrap: word-wrap;
+                                        horizontal-alignment: left;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Metadata Preview Card
+                    if (root.preview_type == "metadata") : Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.dark ? rgba(0, 0, 0, 0.18) : rgba(255, 255, 255, 0.3);
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: Theme.dark ? rgba(255, 255, 255, 0.05) : rgba(0, 0, 0, 0.05);
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 12px;
+                            padding: 20px;
+
+                            Text {
+                                text: root.preview_lang != "" ? root.preview_lang : "FILE";
+                                font-family: Theme.font_family;
+                                font-size: 18px;
+                                font-weight: 700;
+                                color: Theme.accent_blue_text;
+                                horizontal-alignment: center;
+                            }
+                            Text {
+                                text: root.preview_file_size;
+                                font-family: Theme.font_family;
+                                font-size: 13px;
+                                color: Theme.text_secondary;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Theme.dark ? rgba(255, 255, 255, 0.08) : rgba(0, 0, 0, 0.08);
+                    }
+
+                    // Bottom info bar
+                    HorizontalLayout {
+                        alignment: space-between;
+                        Text {
+                            text: root.preview_file_size;
+                            font-family: Theme.font_family;
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: Theme.accent_blue_text;
+                        }
+                        Text {
+                            text: root.preview_file_modified;
+                            font-family: Theme.font_family;
+                            font-size: 12px;
+                            color: Theme.text_secondary;
+                        }
                     }
                 }
             }
@@ -236,5 +501,48 @@ export component LiquidGlassLauncher inherits Rectangle {
                 vertical-alignment: center;
             }
         }
+    }
+
+    // Action Footer Bar
+    footer_bar := Rectangle {
+        visible: root.is_expanded && root.cfg_show_status_bar;
+        x: 0px;
+        y: parent.height - self.height;
+        width: parent.width;
+        height: self.visible ? 28px : 0px;
+        clip: true;
+
+        Rectangle {
+            x: Theme.content_inset;
+            y: 0px;
+            width: parent.width - 2 * Theme.content_inset;
+            height: 1px;
+            background: Theme.dark ? rgba(255, 255, 255, 0.08) : rgba(0, 0, 0, 0.08);
+        }
+
+        HorizontalLayout {
+            width: 100%;
+            height: 100%;
+            padding-left: Theme.content_inset;
+            padding-right: Theme.content_inset;
+            alignment: space-between;
+
+            Text {
+                text: root.action_hint_text;
+                font-family: Theme.font_family;
+                font-size: 11px;
+                color: Theme.text_secondary;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.action_item_count;
+                font-family: Theme.font_family;
+                font-size: 11px;
+                color: Theme.text_secondary;
+                vertical-alignment: center;
+            }
+        }
+    }
     }
 }

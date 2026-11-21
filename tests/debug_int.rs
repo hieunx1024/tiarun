@@ -1,6 +1,6 @@
-use view_launcher::launcher::LauncherEngine;
-use view_launcher::config::Config;
-use view_launcher::icon_resolver::IconResolver;
+use tiarun::launcher::LauncherEngine;
+use tiarun::config::Config;
+use tiarun::icon_resolver::IconResolver;
 
 #[test]
 fn test_live_search_int() {

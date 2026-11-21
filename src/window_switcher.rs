@@ -114,7 +114,7 @@ pub fn get_open_windows(_known_apps: &[LauncherItem]) -> Vec<WindowItem> {
                 .map(|s| s.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
 
-            if bin_name.is_empty() || bin_name == "view-launcher" {
+            if bin_name.is_empty() || bin_name == "tiarun" || bin_name == "view-launcher" {
                 continue;
             }
 
@@ -197,7 +197,7 @@ fn is_background_daemon(name: &str) -> bool {
     const DAEMONS: &[&str] = &[
         "systemd", "dbus", "ibus", "tracker", "portal", "pipewire", "wireplumber",
         "pulseaudio", "gnome-shell", "gnome-session", "gsd-", "evolution-alarm",
-        "gcr-ssh", "snap", "view-launcher", "python", "sh", "bash", "xdg-",
+        "gcr-ssh", "snap", "tiarun", "view-launcher", "python", "sh", "bash", "xdg-",
         "at-spi", "dconf", "gvfs", "agent", "daemon", "service", "appindicators"
     ];
     DAEMONS.iter().any(|&d| name.contains(d))
