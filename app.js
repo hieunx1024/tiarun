@@ -399,6 +399,55 @@
   }
 
   /* ==========================================================================
+     7. Community Donation Dialog Controller
+     ========================================================================== */
+  function initDonateModal() {
+    const dialog = document.getElementById('donate-dialog');
+    const openBtn = document.getElementById('btn-open-donate');
+    const closeBtn = document.getElementById('btn-close-donate');
+
+    if (!dialog) return;
+
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        if (typeof dialog.showModal === 'function') {
+          dialog.showModal();
+        } else {
+          dialog.setAttribute('open', '');
+        }
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        if (typeof dialog.close === 'function') {
+          dialog.close();
+        } else {
+          dialog.removeAttribute('open');
+        }
+      });
+    }
+
+    // Close when clicking outside modal contents (on the backdrop)
+    dialog.addEventListener('click', (event) => {
+      const rect = dialog.getBoundingClientRect();
+      const isInDialog = (
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width
+      );
+      if (!isInDialog) {
+        if (typeof dialog.close === 'function') {
+          dialog.close();
+        } else {
+          dialog.removeAttribute('open');
+        }
+      }
+    });
+  }
+
+  /* ==========================================================================
      DOM Ready Initialization
      ========================================================================== */
   document.addEventListener('DOMContentLoaded', () => {
@@ -408,5 +457,6 @@
     initCommandInspector();
     applyOSAdaptation();
     resolveReleaseData();
+    initDonateModal();
   });
 })();
