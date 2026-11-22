@@ -1,6 +1,6 @@
 ; Inno Setup Script for TiaRun
 #define MyAppName "TiaRun"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Hieu Nguyen"
 #define MyAppURL "https://github.com/hieunx1024/tiarun"
 #define MyAppExeName "tiarun.exe"
