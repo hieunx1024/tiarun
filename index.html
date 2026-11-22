@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TiaRun — Trình khởi chạy ứng dụng cho Windows và Linux</title>
-  <meta name="description" content="Trình khởi chạy nhanh, nhẹ viết bằng Rust cho Windows và Linux. Tìm ứng dụng, tìm tệp gõ tiếng Việt không dấu, xem trước nội dung và tính toán tức thì.">
+  <title>TiaRun — Desktop launcher điều khiển bằng bàn phím cho Windows và Linux</title>
+  <meta name="description" content="Desktop launcher viết bằng Rust cho Windows và Linux. Khởi chạy ứng dụng, tìm file không dấu tiếng Việt, xem nội dung và tính toán trực tiếp từ bàn phím.">
   <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
   <link rel="canonical" href="https://tiarun.vercel.app/">
 
-  <!-- Open Graph / Facebook -->
+  <!-- Open Graph / Social Sharing -->
   <meta property="og:type" content="website">
   <meta property="og:locale" content="vi_VN">
   <meta property="og:url" content="https://tiarun.vercel.app/">
-  <meta property="og:title" content="TiaRun — Trình khởi chạy cho Windows và Linux">
-  <meta property="og:description" content="Mở ứng dụng, tìm tệp gõ tiếng Việt không dấu, tính toán tức thì. Động cơ Rust nhẹ và mở tức thì.">
+  <meta property="og:title" content="TiaRun — Desktop launcher điều khiển bằng bàn phím cho Windows và Linux">
+  <meta property="og:description" content="Khởi chạy ứng dụng, tìm kiếm file không cần gõ dấu tiếng Việt và tính toán từ cùng một thanh lệnh. Viết bằng Rust, xử lý hoàn toàn cục bộ.">
   <meta property="og:image" content="https://tiarun.vercel.app/assets/og-image.png">
-  <meta property="og:image:alt" content="Biểu trưng TiaRun">
+  <meta property="og:image:alt" content="Logo TiaRun">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -27,8 +27,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=1.1.0">
-  <script src="app.js?v=1.1.0" defer></script>
+  <link rel="stylesheet" href="style.css?v=1.2.0">
+  <script src="app.js?v=1.2.0" defer></script>
 </head>
 <body id="top">
   <a class="skip-link" href="#main">Đến nội dung chính</a>
@@ -41,8 +41,9 @@
       </a>
 
       <nav class="site-nav" aria-label="Điều hướng chính">
-        <a href="#gallery" class="nav-link">Tính năng</a>
-        <a href="#usage" class="nav-link">Cách dùng</a>
+        <a href="#gallery" class="nav-link">Giao diện</a>
+        <a href="#usage" class="nav-link">Phím tắt & Cú pháp</a>
+        <a href="#architecture" class="nav-link">Kỹ thuật</a>
         <a href="#download" class="nav-link">Tải về</a>
       </nav>
 
@@ -81,48 +82,48 @@
       <div class="intro">
         <div class="badge-pill">
           <span class="badge-dot" aria-hidden="true"></span>
-          <span>Động cơ Rust siêu nhẹ · Windows & Linux</span>
+          <span>Rust · Single-instance daemon · Windows & Linux</span>
         </div>
-        <h1 id="headline">Mở ứng dụng.<br>Tìm tệp.<br>Tính ngay tức thì.</h1>
+        <h1 id="headline">Khởi chạy ứng dụng và tìm kiếm bằng bàn phím</h1>
         <p class="lede">
-          Gọi TiaRun trong tích tắc bằng phím tắt. Tìm kiếm chính xác không cần gõ dấu tiếng Việt, quản lý clipboard và chuyển cửa sổ nhanh chóng từ cùng một thanh lệnh.
+          Mở nhanh bằng phím tắt. Tự động khớp tiếng Việt không dấu (gõ <code>tai lieu</code> tìm <em>Tài liệu</em>), duyệt file kèm bảng xem trước, chuyển cửa sổ và lưu lịch sử clipboard hoàn toàn trên máy cục bộ.
         </p>
         <div class="hero-actions">
           <a class="button primary hero-download-btn" href="#download">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span class="hero-download-text">Tải TiaRun v1.0.0</span>
+            <span class="hero-download-text">Tải TiaRun v1.0.1</span>
           </a>
           <a class="button secondary" href="#usage">
-            <span>Xem cách dùng</span>
+            <span>Tra cứu cú pháp</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </a>
         </div>
         <p class="hero-os-hint" id="hero-os-hint" hidden></p>
         <div class="shortcut-banner">
-          <span class="shortcut-label">Phím gọi mặc định:</span>
+          <span class="shortcut-label">Phím tắt mặc định:</span>
           <span class="keys">
             <kbd>Ctrl</kbd><span class="key-sep">+</span><kbd>Alt</kbd><span class="key-sep">+</span><kbd>Space</kbd>
           </span>
         </div>
       </div>
 
-      <!-- Feature highlights strip: 4 core points -->
-      <div class="highlights-grid" aria-label="Đặc điểm cốt lõi">
+      <!-- Highlights strip: 4 real engineering points -->
+      <div class="highlights-grid" aria-label="Đặc tính kỹ thuật cốt lõi">
         <div class="highlight-item">
-          <div class="highlight-title">Động cơ Rust tức thì</div>
-          <p class="highlight-desc">Chạy nền dưới dạng daemon duy nhất, gọi cửa sổ tức thì với độ trễ tối thiểu.</p>
+          <div class="highlight-title">Single-instance Daemon</div>
+          <p class="highlight-desc">Tiến trình nền duy nhất lắng nghe qua IPC (Unix socket / loopback port), hiện cửa sổ ngay khi nhận phím tắt mà không khởi động lại engine.</p>
         </div>
         <div class="highlight-item">
-          <div class="highlight-title">Gõ tiếng Việt không dấu</div>
-          <p class="highlight-desc">Khớp chính xác tên ứng dụng và tệp: gõ <code>tai lieu</code> ra ngay <em>Tài liệu</em>.</p>
+          <div class="highlight-title">Fuzzy Search Không Dấu</div>
+          <p class="highlight-desc">Thuật toán SkimMatcherV2 kết hợp bộ chuẩn hóa ký tự tiếng Việt: gõ <code>tai lieu</code> tìm <em>Tài liệu</em>, <code>ke hoach</code> tìm <em>Kế hoạch</em>.</p>
         </div>
         <div class="highlight-item">
-          <div class="highlight-title">Tìm tệp & xem trước</div>
-          <p class="highlight-desc">Tìm nhanh bằng tiền tố <code>@f</code>, tìm nội dung văn bản bằng <code>@t</code> kèm bảng preview.</p>
+          <div class="highlight-title">File Preview & Quét Nội Dung</div>
+          <p class="highlight-desc">Tiền tố <code>@f</code> lọc file kèm bảng xem trước bên phải; <code>@t</code> quét nội dung bên trong file văn bản và tài liệu Word (<code>.docx</code>).</p>
         </div>
         <div class="highlight-item">
-          <div class="highlight-title">Windows & Linux</div>
-          <p class="highlight-desc">Hỗ trợ đầy đủ bộ cài đặt hệ thống lẫn bản portable x86-64 cho cả hai nền tảng.</p>
+          <div class="highlight-title">Gói Cài Đặt & Portable</div>
+          <p class="highlight-desc">Hỗ trợ bộ cài hệ thống và bản nén portable cho Windows (Inno Setup / zip) cùng Linux (Debian <code>.deb</code> / tar.gz) kiến trúc x86-64.</p>
         </div>
       </div>
 
@@ -149,7 +150,7 @@
           </div>
 
           <div class="window-title-bar">
-            <span class="window-title-text">TiaRun — Giao diện ứng dụng</span>
+            <span class="window-title-text">TiaRun — Cửa sổ tìm kiếm</span>
           </div>
 
           <!-- Segmented Control for Gallery Theme (Tối | Sáng) -->
@@ -167,9 +168,9 @@
 
         <!-- 8 Tabs Bar (Horizontal scroll on mobile) -->
         <div class="gallery-tabs-wrapper">
-          <div class="gallery-tabs" role="tablist" aria-label="Các tính năng minh họa">
+          <div class="gallery-tabs" role="tablist" aria-label="Các chế độ hoạt động">
             <label for="example-apps" role="tab" id="tab-apps" class="tab-label" tabindex="0">Ứng dụng</label>
-            <label for="example-files" role="tab" id="tab-files" class="tab-label" tabindex="0">Tệp</label>
+            <label for="example-files" role="tab" id="tab-files" class="tab-label" tabindex="0">File</label>
             <label for="example-text" role="tab" id="tab-text" class="tab-label" tabindex="0">Nội dung</label>
             <label for="example-calc" role="tab" id="tab-calc" class="tab-label" tabindex="0">Máy tính</label>
             <label for="example-windows" role="tab" id="tab-windows" class="tab-label" tabindex="0">Cửa sổ</label>
@@ -182,172 +183,206 @@
         <!-- Visual Stage Content (8 Views) -->
         <figure class="example apps" role="tabpanel" aria-labelledby="tab-apps">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-apps-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun tìm kiếm ứng dụng giao diện Tối" loading="eager">
-            <img class="img-light" src="assets/demo-apps-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun tìm kiếm ứng dụng giao diện Sáng" loading="eager">
+            <img class="img-dark" src="assets/demo-apps-dark.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm ứng dụng trên TiaRun giao diện tối" loading="eager">
+            <img class="img-light" src="assets/demo-apps-light.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm ứng dụng trên TiaRun giao diện sáng" loading="eager">
           </div>
           <figcaption>
-            <span class="caption-lead">Tìm kiếm ứng dụng:</span> Nhập tên ứng dụng rồi nhấn <kbd>Enter</kbd> để mở tức thì. Tự động tìm kiếm tiếng Việt không dấu.
+            Nhập tên ứng dụng rồi nhấn <kbd>Enter</kbd> để chạy. Hỗ trợ tìm không dấu tiếng Việt.
           </figcaption>
         </figure>
 
         <figure class="example files" role="tabpanel" aria-labelledby="tab-files">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-files-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun tìm kiếm tệp và thư mục giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-files-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun tìm kiếm tệp và thư mục giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-files-dark.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm file và thư mục trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-files-light.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm file và thư mục trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Tìm tệp & thư mục:</span> Dùng tiền tố <code>@f</code> để tìm tệp. Cửa sổ bên phải hiển thị bảng xem trước (preview) nội dung tệp. Nhấn <kbd>→</kbd> để duyệt thư mục.
+            Tiền tố <code>@f</code> lọc file và thư mục theo tên, kèm bảng xem trước bên phải. Nhấn <kbd>→</kbd> để duyệt vào thư mục con.
           </figcaption>
         </figure>
 
         <figure class="example text" role="tabpanel" aria-labelledby="tab-text">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-text-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun tìm nội dung bên trong tệp giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-text-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun tìm nội dung bên trong tệp giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-text-dark.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm nội dung văn bản bên trong file trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-text-light.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm nội dung văn bản bên trong file trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Tìm kiếm nội dung:</span> Dùng tiền tố <code>@t</code> để tìm chuỗi văn bản trực tiếp bên trong các tệp mã nguồn, tài liệu và văn bản Word (.docx).
+            Tiền tố <code>@t</code> quét chuỗi văn bản bên trong file text, mã nguồn và tài liệu <code>.docx</code>.
           </figcaption>
         </figure>
 
         <figure class="example calc" role="tabpanel" aria-labelledby="tab-calc">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-calc-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun máy tính và quy đổi đơn vị giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-calc-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun máy tính và quy đổi đơn vị giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-calc-dark.webp?v=1.0.6" width="880" height="540" alt="Tính toán số học và đổi đơn vị trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-calc-light.webp?v=1.0.6" width="880" height="540" alt="Tính toán số học và đổi đơn vị trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Máy tính & quy đổi:</span> Nhập phép tính (<code>500 * 12</code>) hoặc quy đổi đơn vị (<code>25 km to miles</code>, <code>100 usd to vnd</code>). Nhấn <kbd>Enter</kbd> để sao chép kết quả vào clipboard.
+            Nhập biểu thức số học (<code>500 * 12</code>) hoặc quy đổi đơn vị (<code>25 km to miles</code>). Nhấn <kbd>Enter</kbd> để sao chép kết quả.
           </figcaption>
         </figure>
 
         <figure class="example windows" role="tabpanel" aria-labelledby="tab-windows">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-windows-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun chuyển cửa sổ giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-windows-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun chuyển cửa sổ giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-windows-dark.webp?v=1.0.6" width="880" height="540" alt="Chuyển đổi cửa sổ đang mở trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-windows-light.webp?v=1.0.6" width="880" height="540" alt="Chuyển đổi cửa sổ đang mở trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Chuyển cửa sổ nhanh:</span> Dùng tiền tố <code>@w</code> để tìm kiếm và chuyển đổi tiêu điểm ngay lập tức giữa các cửa sổ ứng dụng đang mở trên desktop.
+            Tiền tố <code>@w</code> liệt kê và chuyển focus sang cửa sổ ứng dụng đang mở.
           </figcaption>
         </figure>
 
         <figure class="example clipboard" role="tabpanel" aria-labelledby="tab-clipboard">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-clipboard-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun lịch sử clipboard giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-clipboard-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun lịch sử clipboard giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-clipboard-dark.webp?v=1.0.6" width="880" height="540" alt="Lịch sử clipboard trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-clipboard-light.webp?v=1.0.6" width="880" height="540" alt="Lịch sử clipboard trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Lịch sử Clipboard:</span> Dùng <code>@c</code> để duyệt lại các đoạn văn bản đã sao chép trước đó và dán lại bất kỳ lúc nào mà không lo thất lạc dữ liệu.
+            Tiền tố <code>@c</code> duyệt lịch sử clipboard cục bộ và sao chép lại đoạn văn bản đã lưu.
           </figcaption>
         </figure>
 
         <figure class="example system" role="tabpanel" aria-labelledby="tab-system">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-system-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun lệnh hệ thống giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-system-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun lệnh hệ thống giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-system-dark.webp?v=1.0.6" width="880" height="540" alt="Thao tác lệnh hệ thống trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-system-light.webp?v=1.0.6" width="880" height="540" alt="Thao tác lệnh hệ thống trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Thao tác hệ thống:</span> Dùng <code>@sys</code> để gọi các lệnh điều khiển hệ thống: Khóa màn hình, Ngủ (Sleep), Khởi động lại hoặc Tắt máy tính.
+            Tiền tố <code>@sys</code> gọi lệnh hệ thống: khóa màn hình, sleep, khởi động lại hoặc tắt máy.
           </figcaption>
         </figure>
 
         <figure class="example settings" role="tabpanel" aria-labelledby="tab-settings">
           <div class="example-stage">
-            <img class="img-dark" src="assets/demo-settings-dark.webp?v=1.0.6" width="880" height="540" alt="TiaRun bảng cài đặt giao diện Tối" loading="lazy">
-            <img class="img-light" src="assets/demo-settings-light.webp?v=1.0.6" width="880" height="540" alt="TiaRun bảng cài đặt giao diện Sáng" loading="lazy">
+            <img class="img-dark" src="assets/demo-settings-dark.webp?v=1.0.6" width="880" height="540" alt="Bảng tùy chỉnh cài đặt trên TiaRun giao diện tối" loading="lazy">
+            <img class="img-light" src="assets/demo-settings-light.webp?v=1.0.6" width="880" height="540" alt="Bảng tùy chỉnh cài đặt trên TiaRun giao diện sáng" loading="lazy">
           </div>
           <figcaption>
-            <span class="caption-lead">Tùy biến linh hoạt:</span> Nhấn <kbd>Ctrl</kbd> + <kbd>,</kbd> để mở bảng tùy chỉnh: Kiểu dáng Liquid Glass hoặc Classic, giao diện Sáng/Tối, độ trong suốt và tự khởi động cùng hệ thống.
+            Nhấn <kbd>Ctrl</kbd> + <kbd>,</kbd> để đổi theme Liquid Glass / Classic, độ trong suốt, dark/light và autostart.
           </figcaption>
         </figure>
       </fieldset>
     </section>
 
-    <!-- Usage & Shortcuts Section -->
+    <!-- Usage & Shortcuts Section (Cheatsheet) -->
     <section class="section usage-section" id="usage" aria-labelledby="usage-heading">
       <div class="container section-grid">
         <div class="usage-intro">
-          <h2 id="usage-heading">Cách dùng</h2>
+          <h2 id="usage-heading">Bảng tra cứu cú pháp</h2>
           <p class="usage-summary">
-            Mở TiaRun bằng phím tắt, nhập từ khóa tìm kiếm rồi dùng các phím mũi tên <kbd>↑</kbd> <kbd>↓</kbd> để chọn kết quả. Nhấn <kbd>Enter</kbd> để thực thi hoặc <kbd>Esc</kbd> để đóng.
+            Mọi thao tác đều thực hiện từ cùng một ô tìm kiếm. Dùng phím mũi tên <kbd>↑</kbd> <kbd>↓</kbd> để chọn kết quả, <kbd>Enter</kbd> để thực thi và <kbd>Esc</kbd> để đóng.
           </p>
           <div class="usage-navigation-hint">
-            <div class="hint-title">Phím điều hướng thông minh</div>
+            <div class="hint-title">Phím điều hướng nhanh</div>
             <p>
-              Nhấn <kbd>Tab</kbd> hoặc <kbd>Shift</kbd> + <kbd>Tab</kbd> để chuyển nhanh giữa các chế độ tìm kiếm. Nhấn phím mũi tên <kbd>→</kbd> để duyệt sâu vào thư mục đang chọn.
+              Nhấn <kbd>Tab</kbd> hoặc <kbd>Shift</kbd> + <kbd>Tab</kbd> để đổi nhanh giữa các phạm vi tìm kiếm. Nhấn phím mũi tên <kbd>→</kbd> để duyệt sâu vào thư mục đang chọn.
             </p>
           </div>
         </div>
 
         <div class="commands-wrapper">
           <div class="commands-header-note">
-            <span>Nhấp vào một dòng lệnh để xem hình ảnh minh họa trên khung demo:</span>
+            <span>Bấm vào từng dòng để xem minh họa trực tiếp trên cửa sổ demo phía trên:</span>
           </div>
 
-          <dl class="commands-list" role="list">
-            <div class="command-row" data-target-tab="apps" role="button" tabindex="0" title="Nhấp để xem minh họa Ứng dụng">
-              <dt><code>firefox</code></dt>
-              <dd>
-                <span>Tìm và mở ứng dụng đã cài. Có thể gõ tên tiếng Việt không dấu (ví dụ: <code>cai dat</code>, <code>trinh duyet</code>).</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+          <div class="cheatsheet-table" role="region" aria-label="Bảng cú pháp lệnh TiaRun">
+            <div class="cheatsheet-row header-row">
+              <span class="col-cmd">Cú pháp / Phím tắt</span>
+              <span class="col-desc">Thao tác</span>
+              <span class="col-note">Hành vi & Ghi chú</span>
             </div>
 
-            <div class="command-row" data-target-tab="files" role="button" tabindex="0" title="Nhấp để xem minh họa Tệp">
-              <dt><code>@f tai lieu</code></dt>
-              <dd>
-                <span>Tìm theo tên tệp hoặc thư mục trong các vị trí đã lập chỉ mục. Nhấn <kbd>→</kbd> để mở rộng thư mục.</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="apps" role="button" tabindex="0" title="Bấm để xem minh họa Ứng dụng">
+              <div class="col-cmd"><code>firefox</code></div>
+              <div class="col-desc">Tìm và mở ứng dụng đã cài đặt.</div>
+              <div class="col-note">Tự động khớp không dấu: <code>cai dat</code> tìm thấy Cài đặt. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
 
-            <div class="command-row" data-target-tab="text" role="button" tabindex="0" title="Nhấp để xem minh họa Nội dung">
-              <dt><code>@t ke hoach</code></dt>
-              <dd>
-                <span>Tìm kiếm nội dung chuỗi văn bản bên trong các tệp tài liệu và file Word (.docx).</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="files" role="button" tabindex="0" title="Bấm để xem minh họa File">
+              <div class="col-cmd"><code>@f tai lieu</code></div>
+              <div class="col-desc">Tìm file và thư mục theo tên.</div>
+              <div class="col-note">Quét các thư mục đã cấu hình. Nhấn <kbd>→</kbd> để vào thư mục con. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
 
-            <div class="command-row" data-target-tab="calc" role="button" tabindex="0" title="Nhấp để xem minh họa Máy tính">
-              <dt><code>25 km to miles</code></dt>
-              <dd>
-                <span>Đổi đơn vị đo lường hoặc tính toán biểu thức như <code>500 * 12</code>. Nhấn <kbd>Enter</kbd> để chép kết quả.</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="text" role="button" tabindex="0" title="Bấm để xem minh họa Nội dung">
+              <div class="col-cmd"><code>@t ke hoach</code></div>
+              <div class="col-desc">Tìm chuỗi văn bản bên trong file.</div>
+              <div class="col-note">Hỗ trợ file text, source code và tài liệu Word (<code>.docx</code>). <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
 
-            <div class="command-row" data-target-tab="windows" role="button" tabindex="0" title="Nhấp để xem minh họa Cửa sổ">
-              <dt><code>@w</code></dt>
-              <dd>
-                <span>Tìm kiếm và chuyển đổi tiêu điểm sang cửa sổ ứng dụng đang mở trên desktop.</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="calc" role="button" tabindex="0" title="Bấm để xem minh họa Máy tính">
+              <div class="col-cmd"><code>500 * 12</code></div>
+              <div class="col-desc">Tính toán số học hoặc đổi đơn vị.</div>
+              <div class="col-note">Hỗ trợ đơn vị (<code>25 km to miles</code>) và tiền tệ. Nhấn <kbd>Enter</kbd> để copy. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
 
-            <div class="command-row" data-target-tab="clipboard" role="button" tabindex="0" title="Nhấp để xem minh họa Clipboard">
-              <dt><code>@c</code></dt>
-              <dd>
-                <span>Xem lại danh sách lịch sử các đoạn văn bản đã sao chép và dán nhanh lại.</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="windows" role="button" tabindex="0" title="Bấm để xem minh họa Cửa sổ">
+              <div class="col-cmd"><code>@w</code></div>
+              <div class="col-desc">Liệt kê và chuyển focus cửa sổ.</div>
+              <div class="col-note">Chuyển sang cửa sổ đang chạy. Trên Linux phụ thuộc session X11/Wayland. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
 
-            <div class="command-row" data-target-tab="system" role="button" tabindex="0" title="Nhấp để xem minh họa Hệ thống">
-              <dt><code>@sys</code></dt>
-              <dd>
-                <span>Xem và thực thi các thao tác hệ thống: khóa màn hình, ngủ (sleep), khởi động lại hoặc tắt máy.</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="clipboard" role="button" tabindex="0" title="Bấm để xem minh họa Clipboard">
+              <div class="col-cmd"><code>@c</code></div>
+              <div class="col-desc">Xem lại lịch sử clipboard.</div>
+              <div class="col-note">Lưu trữ cục bộ trên máy. Nhấn <kbd>Enter</kbd> để sao chép lại đoạn văn bản. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
 
-            <div class="command-row" data-target-tab="settings" role="button" tabindex="0" title="Nhấp để xem minh họa Cài đặt">
-              <dt><kbd>Ctrl</kbd><span class="key-sep">+</span><kbd>,</kbd></dt>
-              <dd>
-                <span>Mở bảng tùy chỉnh để chọn chủ đề Liquid Glass/Classic, giao diện Sáng/Tối hoặc tự khởi động.</span>
-                <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span>
-              </dd>
+            <div class="command-row" data-target-tab="system" role="button" tabindex="0" title="Bấm để xem minh họa Hệ thống">
+              <div class="col-cmd"><code>@sys</code></div>
+              <div class="col-desc">Thao tác điều khiển hệ thống.</div>
+              <div class="col-note">Bao gồm khóa màn hình, sleep, khởi động lại và tắt máy. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
             </div>
-          </dl>
+
+            <div class="command-row" data-target-tab="settings" role="button" tabindex="0" title="Bấm để xem minh họa Cài đặt">
+              <div class="col-cmd"><kbd>Ctrl</kbd><span class="key-sep">+</span><kbd>,</kbd></div>
+              <div class="col-desc">Mở bảng tùy chỉnh launcher.</div>
+              <div class="col-note">Đổi theme Liquid Glass / Classic, độ mờ, font và vị trí index file. <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Technical Architecture Section (Fact-based Engineering Notes) -->
+    <section class="section tech-section" id="architecture" aria-labelledby="tech-heading">
+      <div class="container">
+        <div class="tech-header">
+          <h2 id="tech-heading">Kỹ thuật & Vận hành</h2>
+          <p class="tech-lede">Những thông tin cốt lõi về cơ chế hoạt động nội tại của TiaRun.</p>
+        </div>
+
+        <div class="tech-grid">
+          <article class="tech-card">
+            <div class="tech-card-header">
+              <span class="tech-tag">Quyền riêng tư</span>
+              <h3>Xử lý hoàn toàn cục bộ (Local-first)</h3>
+            </div>
+            <p>Toàn bộ quá trình quét ứng dụng, lập chỉ mục file và lưu lịch sử clipboard đều chạy trên máy của bạn. Không gửi telemetry, không kết nối máy chủ phân tích và không đồng bộ dữ liệu ra ngoài.</p>
+          </article>
+
+          <article class="tech-card">
+            <div class="tech-card-header">
+              <span class="tech-tag">Hiệu năng</span>
+              <h3>Cơ chế Single-instance Daemon</h3>
+            </div>
+            <p>TiaRun tạo cửa sổ một lần và duy trì tiến trình nền qua Unix domain socket (Linux) hoặc loopback TCP (Windows). Lần gọi sau chỉ gửi tín hiệu toggle qua socket, không tốn thời gian khởi tạo lại GPU context.</p>
+          </article>
+
+          <article class="tech-card">
+            <div class="tech-card-header">
+              <span class="tech-tag">Công nghệ</span>
+              <h3>Động cơ Rust & Slint GUI</h3>
+            </div>
+            <p>Viết hoàn toàn bằng Rust và framework UI Slint với bộ dựng OpenGL / FemtoVG (tự động fallback phần mềm trên Windows khi thiếu driver), hỗ trợ hai phong cách hiển thị Liquid Glass và Classic.</p>
+          </article>
+
+          <article class="tech-card">
+            <div class="tech-card-header">
+              <span class="tech-tag">Cấu hình</span>
+              <h3>Tệp cấu hình TOML minh bạch</h3>
+            </div>
+            <p>Mọi cài đặt gồm đường dẫn index, độ sâu thư mục (<code>depth</code>) và danh sách loại trừ lưu tại <code>~/.config/tiarun/config.toml</code> (Linux) hoặc <code>%APPDATA%\tiarun\config.toml</code> (Windows).</p>
+          </article>
         </div>
       </div>
     </section>
@@ -357,11 +392,11 @@
       <div class="container">
         <div class="download-heading">
           <div class="download-title-group">
-            <h2 id="download-heading">Tải TiaRun</h2>
-            <span class="release-tag-badge" id="release-version-badge">v1.0.0</span>
+            <h2 id="download-heading">Bản phát hành</h2>
+            <span class="release-tag-badge" id="release-version-badge">v1.0.1</span>
           </div>
           <a class="text-link" href="https://github.com/hieunx1024/tiarun/releases" target="_blank" rel="noopener noreferrer">
-            <span>Tất cả bản phát hành</span>
+            <span>Tất cả phiên bản</span>
             <svg class="external-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           </a>
         </div>
@@ -384,7 +419,7 @@
               </span>
             </div>
 
-            <p class="card-desc">Chạy bộ cài đặt tự động <code>.exe</code> hoặc giải nén bản Portable <code>.zip</code> rồi mở ứng dụng.</p>
+            <p class="card-desc">Bộ cài đặt tự động thiết lập phím tắt và Start Menu, hoặc bản nén portable chạy trực tiếp không cần cài đặt.</p>
 
             <div class="card-actions">
               <a class="button primary download-btn" data-package="exe" href="https://github.com/hieunx1024/tiarun/releases/latest">
@@ -394,7 +429,7 @@
               </a>
 
               <a class="text-link secondary-download" data-package="zip" href="https://github.com/hieunx1024/tiarun/releases/latest">
-                <span>Bản nén Portable (.zip)</span>
+                <span>Bản nén portable (.zip)</span>
                 <span class="file-size-inline" id="size-zip">(5.1 MB)</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </a>
@@ -422,7 +457,7 @@
               </span>
             </div>
 
-            <p class="card-desc">Gói <code>.deb</code> dành cho Debian / Ubuntu hoặc tệp nén <code>.tar.gz</code> chứa file thực thi độc lập.</p>
+            <p class="card-desc">Gói <code>.deb</code> tích hợp desktop entry cho Debian / Ubuntu, hoặc file nén chứa binary thực thi độc lập.</p>
 
             <div class="card-actions">
               <a class="button primary download-btn" data-package="deb" href="https://github.com/hieunx1024/tiarun/releases/latest">
@@ -432,7 +467,7 @@
               </a>
 
               <a class="text-link secondary-download" data-package="tar" href="https://github.com/hieunx1024/tiarun/releases/latest">
-                <span>Bản nén độc lập (.tar.gz)</span>
+                <span>Bản nén binary (.tar.gz)</span>
                 <span class="file-size-inline" id="size-tar">(7.2 MB)</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </a>
@@ -440,21 +475,20 @@
           </article>
         </div>
 
-
         <!-- Build from Source Collapsible -->
         <details class="build-guide">
           <summary>Biên dịch từ mã nguồn (Rust)</summary>
           <div class="build-guide-content">
-            <p>Cần Rust phiên bản ổn định (stable toolchain) và Cargo. Trên Debian / Ubuntu, cài đặt các thư viện phụ thuộc giao diện:</p>
+            <p>Cần Rust toolchain phiên bản ổn định (stable) và Cargo. Cài đặt các thư viện đồ họa hệ thống trên Debian / Ubuntu:</p>
             <pre><code>sudo apt install build-essential pkg-config libxkbcommon-dev libxkbcommon-x11-dev \
   libfontconfig1-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libx11-dev libx11-xcb-dev</code></pre>
-            <p>Sau đó clone mã nguồn và biên dịch chế độ release tối ưu tốc độ:</p>
+            <p>Clone repository và biên dịch bản release tối ưu:</p>
             <pre><code>git clone https://github.com/hieunx1024/tiarun.git
 cd tiarun
 cargo build --release --locked</code></pre>
-            <p>Tệp thực thi nằm tại <code>target/release/tiarun</code> (Linux) hoặc <code>target\release\tiarun.exe</code> (Windows).</p>
+            <p>File thực thi sau khi biên dịch nằm tại <code>target/release/tiarun</code> (Linux) hoặc <code>target\release\tiarun.exe</code> (Windows).</p>
             <a class="text-link" href="https://github.com/hieunx1024/tiarun#build-from-source" target="_blank" rel="noopener noreferrer">
-              <span>Xem tài liệu kỹ thuật trên GitHub</span>
+              <span>Xem tài liệu chi tiết trên GitHub</span>
               <svg class="external-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>
           </div>
@@ -468,7 +502,7 @@ cargo build --release --locked</code></pre>
       <div class="footer-brand">
         <img src="assets/logo.svg" alt="" width="22" height="22" class="brand-logo">
         <span class="footer-name">TiaRun</span>
-        <span class="footer-desc">Trình khởi chạy mã nguồn mở cho Windows & Linux.</span>
+        <span class="footer-desc">Desktop launcher nguồn mở viết bằng Rust cho Windows & Linux.</span>
       </div>
 
       <nav class="footer-nav" aria-label="Liên kết dự án">
