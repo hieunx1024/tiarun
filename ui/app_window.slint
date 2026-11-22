@@ -13,10 +13,12 @@ export component AppWindow inherits Window {
     width: root.launcher_width;
     height: root.launcher_height;
     in-out property <bool> cfg_enable_shadow_margin: true;
+    in-out property <bool> cfg_fixed_width: false;
     property <length> shadow_margin: root.cfg_enable_shadow_margin && root.cfg_view_style == "liquid_glass" && !root.in_settings_mode ? Theme.shadow_margin : 0px;
     property <length> content_height: root.in_settings_mode ? Theme.settings_height :
         (root.is_showing_list ? Theme.panel_height : Theme.pill_height);
-    property <length> panel_base_width: (root.is_showing_list && !root.in_settings_mode) ? Theme.panel_width : Theme.pill_width;
+    property <length> panel_base_width: root.cfg_fixed_width ? Theme.panel_width :
+        ((root.is_showing_list && !root.in_settings_mode) ? Theme.panel_width : Theme.pill_width);
     out property <length> launcher_width: root.panel_base_width + 2 * root.shadow_margin;
     out property <length> launcher_height: root.content_height + root.shadow_margin;
     out property <length> launcher_radius: root.is_showing_list ? Theme.panel_radius : Theme.pill_radius;
@@ -62,6 +64,7 @@ export component AppWindow inherits Window {
     in-out property <bool> is_showing_list: root.in_settings_mode
         || root.search_text != ""
         || root.is_expanded
+        || root.cfg_fixed_width
         || (!root.cfg_compact_empty && root.cfg_view_style != "liquid_glass");
 
     // Action Vector Icons

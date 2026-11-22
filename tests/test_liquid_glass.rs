@@ -61,6 +61,13 @@ fn test_liquid_glass_style_and_expansion() {
         assert_eq!(ui.get_launcher_height(), 428.0);
         ui.set_in_settings_mode(false);
         ui.set_is_expanded(false);
+
+        // GNOME Wayland fixed geometry mode
+        ui.set_cfg_fixed_width(true);
+        assert_eq!(ui.get_launcher_width(), 920.0 + 2.0 * shadow_margin);
+        assert_eq!(ui.get_launcher_height(), 520.0 + shadow_margin);
+        assert_eq!(ui.get_launcher_radius(), 18.0);
+        ui.set_cfg_fixed_width(false);
     }
 }
 

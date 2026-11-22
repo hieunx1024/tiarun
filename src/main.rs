@@ -609,6 +609,18 @@ fn launcher_is_placed_on_sway(ui: &AppWindow) -> Option<bool> {
     Some(positioned)
 }
 
+fn is_gnome_desktop() -> bool {
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_lowercase();
+        let is_sway = std::env::var_os("SWAYSOCK").is_some() || desktop.contains("sway");
+        let is_hyprland = std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() || desktop.contains("hyprland");
+        !is_sway && !is_hyprland && desktop.contains("gnome")
+    }
+    #[cfg(not(all(unix, not(target_os = "macos"))))]
+    false
+}
+
 fn show_and_focus_launcher(
     ui: &AppWindow,
     ui_weak: slint::Weak<AppWindow>,
@@ -623,6 +635,9 @@ fn show_and_focus_launcher(
     ui.set_is_dark(cfg.theme.is_dark());
     ui.set_cfg_compact_empty(cfg.theme.compact_empty_view.unwrap_or(true));
     ui.set_cfg_view_style(cfg.theme.view_style.clone().into());
+    if is_gnome_desktop() {
+        ui.set_cfg_fixed_width(true);
+    }
     ui.set_search_text(query.into());
     ui.set_active_category("".into());
     ui.set_active_scope("apps".into());
@@ -1505,6 +1520,9 @@ fn run_dmenu_mode(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
     let ui = AppWindow::new()?;
     #[cfg(target_os = "windows")]
     ui.set_cfg_enable_shadow_margin(false);
+    if is_gnome_desktop() {
+        ui.set_cfg_fixed_width(true);
+    }
     ui.set_categories_enabled(false);
     ui.set_mode_title(prompt.to_string().into());
     ui.set_mode_badge_text("dmenu".into());
@@ -1891,6 +1909,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.set_cfg_theme_mode(config.theme.mode.clone().into());
     ui.set_cfg_theme_opacity(config.theme.opacity);
     ui.set_is_dark(config.theme.is_dark());
+    if is_gnome_desktop() {
+        ui.set_cfg_fixed_width(true);
+    }
 
     let engine = Arc::new(LauncherEngine::new(config));
     let icon_resolver = Arc::new(IconResolver::new());
