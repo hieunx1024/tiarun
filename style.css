@@ -997,24 +997,31 @@ html[data-theme="light"] .icon-sun { display: block; }
 }
 
 .col-note {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 0.75rem;
   font-size: 0.88rem;
   color: var(--text-secondary);
-  flex-wrap: wrap;
+  line-height: 1.5;
   min-width: 0;
 }
 
+.note-text {
+  display: inline;
+}
+
+.text-nowrap {
+  white-space: nowrap;
+}
+
 .inspect-tag {
-  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--accent);
+  white-space: nowrap;
+  margin-left: 0.45rem;
   opacity: 0;
   transform: translateX(-4px);
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
 /* ==========================================================================
@@ -1649,16 +1656,16 @@ html[data-theme="light"] .donate-dialog::backdrop {
   }
 
   .col-note {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
     width: 100%;
+    line-height: 1.5;
   }
 
   .inspect-tag {
+    display: inline-flex;
     opacity: 0.85;
     transform: none;
     font-size: 0.78rem;
+    margin-left: 0.4rem;
   }
 }
 
