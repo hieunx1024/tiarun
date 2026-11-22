@@ -30,8 +30,8 @@
       root.setAttribute('data-theme', theme);
       if (toggleBtn) {
         const isDark = theme === 'dark';
-        toggleBtn.setAttribute('aria-label', isDark ? 'Chuyển sang chế độ Sáng' : 'Chuyển sang chế độ Tối');
-        toggleBtn.setAttribute('title', isDark ? 'Chuyển sang chế độ Sáng' : 'Chuyển sang chế độ Tối');
+        toggleBtn.setAttribute('aria-label', isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối');
+        toggleBtn.setAttribute('title', isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối');
       }
     }
 
@@ -116,17 +116,24 @@
     const tabRadios = document.querySelectorAll('.tab-radio');
     const tabLabels = document.querySelectorAll('.tab-label');
 
+    function scrollLabelIntoView(label) {
+      if (!label) return;
+      label.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+
     tabRadios.forEach((radio) => {
       radio.addEventListener('change', () => {
         if (!radio.checked) return;
         const matchingLabel = document.querySelector(`label[for="${radio.id}"]`);
-        if (matchingLabel) {
-          matchingLabel.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
+        scrollLabelIntoView(matchingLabel);
       });
     });
 
     tabLabels.forEach((label) => {
+      label.addEventListener('click', () => {
+        requestAnimationFrame(() => scrollLabelIntoView(label));
+      });
+
       label.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -135,6 +142,7 @@
           if (targetRadio) {
             targetRadio.checked = true;
             targetRadio.dispatchEvent(new Event('change'));
+            scrollLabelIntoView(label);
           }
         }
       });
@@ -154,6 +162,11 @@
 
       radio.checked = true;
       radio.dispatchEvent(new Event('change'));
+
+      const matchingLabel = document.querySelector(`label[for="example-${tabKey}"]`);
+      if (matchingLabel) {
+        matchingLabel.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
 
       if (galleryEl) {
         galleryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -211,21 +224,55 @@
     const cardWin = document.getElementById('card-windows');
     const badgeLinux = document.getElementById('badge-linux');
     const cardLinux = document.getElementById('card-linux');
+    const btnExe = document.querySelector('[data-package="exe"]');
+    const btnDeb = document.querySelector('[data-package="deb"]');
 
-    // 1. Highlight appropriate download card
+    // 1. Reset everything first (clean state)
+    if (badgeWin) badgeWin.hidden = true;
+    if (badgeLinux) badgeLinux.hidden = true;
+    if (cardWin) cardWin.classList.remove('highlighted-os');
+    if (cardLinux) cardLinux.classList.remove('highlighted-os');
+
+    // 2. Adjust button styles and card highlights based strictly on detected OS
     if (currentDetectedOS === 'windows') {
       if (badgeWin) badgeWin.hidden = false;
       if (cardWin) cardWin.classList.add('highlighted-os');
-      if (badgeLinux) badgeLinux.hidden = true;
-      if (cardLinux) cardLinux.classList.remove('highlighted-os');
+
+      // Windows primary, Linux secondary
+      if (btnExe) {
+        btnExe.classList.add('primary');
+        btnExe.classList.remove('secondary');
+      }
+      if (btnDeb) {
+        btnDeb.classList.add('secondary');
+        btnDeb.classList.remove('primary');
+      }
     } else if (currentDetectedOS === 'linux') {
       if (badgeLinux) badgeLinux.hidden = false;
       if (cardLinux) cardLinux.classList.add('highlighted-os');
-      if (badgeWin) badgeWin.hidden = true;
-      if (cardWin) cardWin.classList.remove('highlighted-os');
+
+      // Linux primary, Windows secondary
+      if (btnDeb) {
+        btnDeb.classList.add('primary');
+        btnDeb.classList.remove('secondary');
+      }
+      if (btnExe) {
+        btnExe.classList.add('secondary');
+        btnExe.classList.remove('primary');
+      }
+    } else {
+      // Other OS (macOS, mobile, unknown): both badges stay hidden, both buttons neutral
+      if (btnExe) {
+        btnExe.classList.add('secondary');
+        btnExe.classList.remove('primary');
+      }
+      if (btnDeb) {
+        btnDeb.classList.add('secondary');
+        btnDeb.classList.remove('primary');
+      }
     }
 
-    // 2. Update Hero CTA and hint based on detected OS
+    // 3. Update Hero CTA and hint based on detected OS
     updateHeroCTA();
   }
 
@@ -244,7 +291,7 @@
         heroBtn.href = '#card-linux';
       }
       if (heroHint) {
-        heroHint.textContent = 'Phát hiện máy bạn dùng Linux (x86-64). Cũng có sẵn cho Windows.';
+        heroHint.textContent = 'Đang mở trên Linux (x86-64). Có cả bản cho Windows.';
         heroHint.hidden = false;
       }
     } else if (currentDetectedOS === 'windows') {
@@ -255,7 +302,7 @@
         heroBtn.href = '#card-windows';
       }
       if (heroHint) {
-        heroHint.textContent = 'Phát hiện máy bạn dùng Windows (x86-64). Cũng có sẵn cho Linux.';
+        heroHint.textContent = 'Đang mở trên Windows (x86-64). Có cả bản cho Linux.';
         heroHint.hidden = false;
       }
     } else {
