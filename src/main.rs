@@ -79,14 +79,17 @@ fn is_launcher_focused(ui: &AppWindow) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn apply_windows_rounded_corners(ui: &AppWindow) {
+fn configure_windows_borderless_transparent(ui: &AppWindow) {
     ui.window().with_winit_window(|winit_window| {
         use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
         use windows_sys::Win32::Foundation::HWND;
-        use windows_sys::Win32::UI::Controls::MARGINS;
         use windows_sys::Win32::Graphics::Dwm::{
-            DwmExtendFrameIntoClientArea, DwmSetWindowAttribute,
-            DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+            DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE,
+            SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+            WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
         };
 
         if let Ok(handle) = winit_window.window_handle() {
@@ -94,17 +97,26 @@ fn apply_windows_rounded_corners(ui: &AppWindow) {
                 let hwnd = win32_handle.hwnd.get() as HWND;
 
                 unsafe {
-                    // 1. DWM Glass/Alpha Composition across full window area
-                    let margins = MARGINS {
-                        cxLeftWidth: -1,
-                        cxRightWidth: -1,
-                        cyTopHeight: -1,
-                        cyBottomHeight: -1,
-                    };
-                    let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+                    // 1. Strip titlebar caption, system menu, and minimize/maximize buttons
+                    // so Windows DWM never renders any native caption buttons into the launcher window.
+                    let current_style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+                    let stripped = current_style & !(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+                    if stripped != current_style {
+                        SetWindowLongPtrW(hwnd, GWL_STYLE, stripped as isize);
+                        SetWindowPos(
+                            hwnd,
+                            std::ptr::null_mut(),
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+                        );
+                    }
 
-                    // 2. Windows 11 Native Rounded Corners (anti-aliased at DWM compositor level)
-                    let preference = DWMWCP_ROUND as u32;
+                    // 2. Disable Windows 11 DWM outer rectangular border & rounding;
+                    // Slint draws its own anti-aliased rounded liquid-glass pill directly into the transparent canvas.
+                    let preference = DWMWCP_DONOTROUND as u32;
                     let _ = DwmSetWindowAttribute(
                         hwnd,
                         DWMWA_WINDOW_CORNER_PREFERENCE as u32,
@@ -353,7 +365,6 @@ fn resize_window_for_state(ui: &AppWindow) {
 
     #[cfg(target_os = "windows")]
     {
-        apply_windows_rounded_corners(ui);
         reposition_and_anchor_window(ui);
     }
 
@@ -1530,7 +1541,7 @@ fn run_dmenu_mode(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     #[cfg(target_os = "windows")]
-    apply_windows_rounded_corners(&ui);
+    configure_windows_borderless_transparent(&ui);
 
     let current_filtered = std::rc::Rc::new(std::cell::RefCell::new(raw_lines.clone()));
 
@@ -1967,7 +1978,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     center_window(&ui);
     #[cfg(target_os = "windows")]
-    apply_windows_rounded_corners(&ui);
+    configure_windows_borderless_transparent(&ui);
 
     // Runtime blur backend detection and startup status reporting
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -1997,8 +2008,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             move || {
                 if let Some(ui) = ui_weak.upgrade() {
                     center_window(&ui);
-                    #[cfg(target_os = "windows")]
-                    apply_windows_rounded_corners(&ui);
                 }
             },
         );
