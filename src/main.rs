@@ -2381,7 +2381,9 @@ fn switch_to_scope(ui: &AppWindow, target_scope: &str) -> String {
                     || trimmed.starts_with("@fc")
                     || trimmed.starts_with("@t")
                     || trimmed.starts_with('/')
-                    || trimmed.starts_with('~');
+                    || trimmed.starts_with('~')
+                    || (cfg!(windows) && trimmed.len() >= 2 && trimmed.as_bytes()[1] == b':')
+                    || trimmed.starts_with('\\');
                 let is_showing_list = ui.get_is_showing_list();
                 if let Ok(lock) = current_results.read() {
                     let item = lock.get(next as usize);
@@ -2436,7 +2438,9 @@ fn switch_to_scope(ui: &AppWindow, target_scope: &str) -> String {
                     || trimmed.starts_with("@fc")
                     || trimmed.starts_with("@t")
                     || trimmed.starts_with('/')
-                    || trimmed.starts_with('~');
+                    || trimmed.starts_with('~')
+                    || (cfg!(windows) && trimmed.len() >= 2 && trimmed.as_bytes()[1] == b':')
+                    || trimmed.starts_with('\\');
                 let is_showing_list = ui.get_is_showing_list();
                 if let Ok(lock) = current_results.read() {
                     let item = lock.get(next as usize);
@@ -2476,8 +2480,9 @@ fn switch_to_scope(ui: &AppWindow, target_scope: &str) -> String {
                         path = format!("~{}", &path[home_str.len()..]);
                     }
                 }
-                if !path.ends_with('/') {
-                    path.push('/');
+                let sep = std::path::MAIN_SEPARATOR;
+                if !path.ends_with('/') && !path.ends_with('\\') {
+                    path.push(sep);
                 }
                 let prefix = if search_text.starts_with("@file ") || search_text == "@file" {
                     "@file "
@@ -2550,8 +2555,11 @@ fn step_out_directory(
 ) -> bool {
     let search_text = ui.get_search_text().to_string();
     let is_file_mode = search_text.starts_with("@f ") || search_text.starts_with("@file ");
-    let is_path_mode = search_text.starts_with('/') || search_text.starts_with('~');
-    if (is_file_mode || is_path_mode) && search_text.ends_with('/') {
+    let is_path_mode = search_text.starts_with('/')
+        || search_text.starts_with('~')
+        || (cfg!(windows) && search_text.len() >= 2 && search_text.as_bytes()[1] == b':')
+        || search_text.starts_with('\\');
+    if (is_file_mode || is_path_mode) && (search_text.ends_with('/') || search_text.ends_with('\\')) {
         let prefix_len = if search_text.starts_with("@file ") {
             6
         } else if search_text.starts_with("@f ") {
@@ -2560,8 +2568,8 @@ fn step_out_directory(
             0
         };
         let path_part = &search_text[prefix_len..];
-        let trimmed_path = path_part.trim_end_matches('/');
-        if let Some(pos) = trimmed_path.rfind('/') {
+        let trimmed_path = path_part.trim_end_matches(|c| c == '/' || c == '\\');
+        if let Some(pos) = trimmed_path.rfind(|c| c == '/' || c == '\\') {
             let parent_path = &trimmed_path[..=pos];
             let new_search_text = format!("{}{}", &search_text[..prefix_len], parent_path);
             ui.set_search_text(new_search_text.clone().into());

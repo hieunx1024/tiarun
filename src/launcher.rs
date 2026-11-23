@@ -492,11 +492,21 @@ impl LauncherEngine {
         let search_paths = if config.search.paths.is_empty() {
             let mut defaults = Vec::new();
 
-            if let Some(dir) = dirs::document_dir() {
+            // Index fast, shallow personal user directories first
+            if let Some(dir) = dirs::home_dir() {
                 defaults.push(crate::config::SearchPathConfig {
                     path: dir.to_string_lossy().to_string(),
-                    depth: 4,
-                    max_depth: Some(4),
+                    depth: 1,
+                    max_depth: Some(1),
+                    exclude: Vec::new(),
+                });
+            }
+
+            if let Some(dir) = dirs::desktop_dir() {
+                defaults.push(crate::config::SearchPathConfig {
+                    path: dir.to_string_lossy().to_string(),
+                    depth: 2,
+                    max_depth: Some(2),
                     exclude: Vec::new(),
                 });
             }
@@ -510,11 +520,11 @@ impl LauncherEngine {
                 });
             }
 
-            if let Some(dir) = dirs::desktop_dir() {
+            if let Some(dir) = dirs::document_dir() {
                 defaults.push(crate::config::SearchPathConfig {
                     path: dir.to_string_lossy().to_string(),
-                    depth: 2,
-                    max_depth: Some(2),
+                    depth: 4,
+                    max_depth: Some(4),
                     exclude: Vec::new(),
                 });
             }
@@ -529,15 +539,6 @@ impl LauncherEngine {
             }
 
             if let Some(dir) = dirs::video_dir() {
-                defaults.push(crate::config::SearchPathConfig {
-                    path: dir.to_string_lossy().to_string(),
-                    depth: 1,
-                    max_depth: Some(1),
-                    exclude: Vec::new(),
-                });
-            }
-
-            if let Some(dir) = dirs::home_dir() {
                 defaults.push(crate::config::SearchPathConfig {
                     path: dir.to_string_lossy().to_string(),
                     depth: 1,
@@ -648,7 +649,7 @@ impl LauncherEngine {
         } else if input.starts_with(r"~\") {
             input.replacen(r"~\", &format!("{home_str}{sep}"), 1)
         } else if input == "~" {
-            home_str.to_string()
+            format!("{home_str}{sep}")
         } else {
             input.to_string()
         };
@@ -1481,9 +1482,8 @@ impl LauncherEngine {
             ));
         }
 
-        // 3. Duyệt đường dẫn trực tiếp nếu bắt đầu bằng '/' hoặc '~'
-        if trimmed_query.starts_with('/') || trimmed_query.starts_with('~') {
-            if let Some((dir, filter)) = self.resolve_path_search(trimmed_query) {
+        // 3. Duyệt đường dẫn trực tiếp nếu là đường dẫn hợp lệ (bắt đầu bằng '/', '~', '\', hoặc ổ đĩa Windows 'C:\')
+        if let Some((dir, filter)) = self.resolve_path_search(trimmed_query) {
                 if filter.is_empty() {
                     let dir_items = self.scan_dir_on_the_fly(&dir);
                     for item in dir_items {
@@ -1522,7 +1522,6 @@ impl LauncherEngine {
                 }
                 return results;
             }
-        }
 
         // 4. Khi chưa gõ: Hiển thị ứng dụng đã ghim (Pinned) -> Ứng dụng tùy biến -> Ứng dụng hệ thống
         if trimmed_query.is_empty() {
@@ -1594,6 +1593,48 @@ impl LauncherEngine {
 
         for (item_with_indices, _) in custom_matches {
             results.push(item_with_indices);
+        }
+
+        // Bổ sung các tệp tin phù hợp từ shallow_files vào kết quả tìm kiếm chính
+        let remaining_slots = self.config.search.max_results.saturating_sub(results.len());
+        if remaining_slots > 0 {
+            let enable_path_matching = self.config.search.enable_path_matching.unwrap_or(true);
+            let mut file_matches: Vec<((LauncherItem, Vec<usize>), i64)> = shallow_files_guard
+                .par_iter()
+                .filter_map(|file| {
+                    if cancelled() {
+                        return None;
+                    }
+                    let match_res = self.match_precomputed(
+                        &file.name,
+                        &file.normalized_name,
+                        trimmed_query,
+                        &query_normalized,
+                    );
+                    let final_res = if match_res.is_some() {
+                        match_res
+                    } else if enable_path_matching {
+                        self.match_precomputed(
+                            &file.exec_or_path,
+                            &remove_vietnamese_accents(&file.exec_or_path),
+                            trimmed_query,
+                            &query_normalized,
+                        )
+                    } else {
+                        None
+                    };
+
+                    final_res.map(|(score, indices)| {
+                        let boost = history_guard.get_boost(&file.exec_or_path);
+                        ((file.clone(), indices), score + boost)
+                    })
+                })
+                .collect();
+
+            file_matches.sort_by(|a, b| b.1.cmp(&a.1));
+            for (item_with_indices, _) in file_matches.into_iter().take(remaining_slots.min(10)) {
+                results.push(item_with_indices);
+            }
         }
 
         // 9. Web Search Fallback: always offered as a last-resort action for
@@ -2457,6 +2498,26 @@ mod tests {
         let engine = LauncherEngine::new(config);
         let results = engine.search("@f");
         assert!(results.iter().all(|(item, _)| item.item_type == ItemType::File || item.item_type == ItemType::Dir));
+    }
+
+    #[test]
+    fn test_general_search_finds_shallow_files() {
+        let config = Config::default();
+        let engine = LauncherEngine::new(config);
+        {
+            let mut lock = engine.shallow_files.write().unwrap();
+            lock.push(LauncherItem::new(
+                "hello.txt".to_string(),
+                "/home/user/hello.txt".to_string(),
+                ItemType::File,
+                Some("Test File".to_string()),
+                false,
+                None,
+            ));
+        }
+
+        let results = engine.search("hello");
+        assert!(results.iter().any(|(item, _)| item.name == "hello.txt"));
     }
 
     #[test]

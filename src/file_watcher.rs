@@ -9,36 +9,71 @@ pub struct FileWatcher {
 }
 
 impl FileWatcher {
-    /// Starts watching hot directories (e.g. Desktop, Downloads) in the background.
+    /// Starts watching hot directories (Desktop, Downloads, Documents, Home non-recursive) in the background.
     /// Newly added files are inserted into `shallow_files` and deleted files are removed.
     pub fn start(
         files: Arc<RwLock<Vec<LauncherItem>>>,
         config: &Config,
     ) -> Option<Self> {
-        let mut watch_dirs = Vec::new();
+        let mut recursive_dirs = Vec::new();
         if let Some(desktop) = dirs::desktop_dir() {
             if desktop.exists() {
-                watch_dirs.push(desktop);
+                recursive_dirs.push(desktop);
             }
         }
         if let Some(downloads) = dirs::download_dir() {
             if downloads.exists() {
-                watch_dirs.push(downloads);
+                recursive_dirs.push(downloads);
+            }
+        }
+        if let Some(documents) = dirs::document_dir() {
+            if documents.exists() {
+                recursive_dirs.push(documents);
+            }
+        }
+        for entry in &config.search.paths {
+            let expanded = crate::launcher::expand_tilde(&entry.path);
+            let path = PathBuf::from(expanded);
+            if path.exists() && !recursive_dirs.contains(&path) {
+                recursive_dirs.push(path);
             }
         }
 
-        Self::start_with_dirs(files, config, watch_dirs)
+        let mut non_recursive_dirs = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            if home.exists() && !recursive_dirs.contains(&home) {
+                non_recursive_dirs.push(home);
+            }
+        }
+
+        Self::start_with_all_dirs(files, config, recursive_dirs, non_recursive_dirs)
     }
 
-    /// Starts watching specific directories for file creation/modification/removal.
+    /// Starts watching specific directories recursively.
     pub fn start_with_dirs(
         files: Arc<RwLock<Vec<LauncherItem>>>,
         config: &Config,
         dirs: Vec<PathBuf>,
     ) -> Option<Self> {
+        Self::start_with_all_dirs(files, config, dirs, Vec::new())
+    }
+
+    /// Starts watching recursive and non-recursive directories for file creation/modification/removal.
+    pub fn start_with_all_dirs(
+        files: Arc<RwLock<Vec<LauncherItem>>>,
+        config: &Config,
+        recursive_dirs: Vec<PathBuf>,
+        non_recursive_dirs: Vec<PathBuf>,
+    ) -> Option<Self> {
         let ignored_dirs = config.search.ignored_dirs.clone();
         let ignored_exts = config.search.ignored_extensions.clone();
-        let watch_roots = Arc::new(dirs.clone());
+        let mut all_roots = recursive_dirs.clone();
+        for dir in &non_recursive_dirs {
+            if !all_roots.contains(dir) {
+                all_roots.push(dir.clone());
+            }
+        }
+        let watch_roots = Arc::new(all_roots);
 
         let files_clone = files.clone();
         let roots_clone = watch_roots.clone();
@@ -52,8 +87,13 @@ impl FileWatcher {
         ).ok()?;
 
         let mut watched_any = false;
-        for dir in dirs {
+        for dir in recursive_dirs {
             if watcher.watch(&dir, RecursiveMode::Recursive).is_ok() {
+                watched_any = true;
+            }
+        }
+        for dir in non_recursive_dirs {
+            if watcher.watch(&dir, RecursiveMode::NonRecursive).is_ok() {
                 watched_any = true;
             }
         }
