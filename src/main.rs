@@ -83,7 +83,6 @@ fn apply_windows_rounded_corners(ui: &AppWindow) {
     ui.window().with_winit_window(|winit_window| {
         use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
         use windows_sys::Win32::Foundation::HWND;
-        use windows_sys::Win32::Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn};
         use windows_sys::Win32::UI::Controls::MARGINS;
         use windows_sys::Win32::Graphics::Dwm::{
             DwmExtendFrameIntoClientArea, DwmSetWindowAttribute,
@@ -93,10 +92,6 @@ fn apply_windows_rounded_corners(ui: &AppWindow) {
         if let Ok(handle) = winit_window.window_handle() {
             if let RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
                 let hwnd = win32_handle.hwnd.get() as HWND;
-                let scale = winit_window.scale_factor();
-                let width = (f64::from(ui.get_launcher_width()) * scale) as i32;
-                let height = (f64::from(ui.get_launcher_height()) * scale) as i32;
-                let radius = (f64::from(ui.get_launcher_radius()) * scale) as i32;
 
                 unsafe {
                     // 1. DWM Glass/Alpha Composition across full window area
@@ -108,7 +103,7 @@ fn apply_windows_rounded_corners(ui: &AppWindow) {
                     };
                     let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
 
-                    // 2. Windows 11 Native Rounded Corners
+                    // 2. Windows 11 Native Rounded Corners (anti-aliased at DWM compositor level)
                     let preference = DWMWCP_ROUND as u32;
                     let _ = DwmSetWindowAttribute(
                         hwnd,
@@ -116,24 +111,6 @@ fn apply_windows_rounded_corners(ui: &AppWindow) {
                         &preference as *const _ as *const _,
                         std::mem::size_of_val(&preference) as u32,
                     );
-
-                    // 3. Physical HWND rounded region clipping - eliminates any black corners
-                    // even on software renderer, VMs, or when DWM compositing doesn't alpha-blend corners!
-                    if width > 0 && height > 0 {
-                        let hrgn = CreateRoundRectRgn(
-                            0,
-                            0,
-                            width + 1,
-                            height + 1,
-                            radius * 2,
-                            radius * 2,
-                        );
-                        if !hrgn.is_null() {
-                            if SetWindowRgn(hwnd, hrgn, 1) == 0 {
-                                DeleteObject(hrgn);
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -256,21 +233,6 @@ fn apply_skip_taskbar(winit_window: &i_slint_backend_winit::winit::window::Windo
     {
         use i_slint_backend_winit::winit::platform::windows::WindowExtWindows;
         winit_window.set_skip_taskbar(true);
-
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
-        };
-        use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
-        if let Ok(handle) = winit_window.window_handle() {
-            if let RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
-                let hwnd = win32_handle.hwnd.get() as windows_sys::Win32::Foundation::HWND;
-                unsafe {
-                    let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-                    let new_ex_style = (ex_style | (WS_EX_TOOLWINDOW as isize)) & !(WS_EX_APPWINDOW as isize);
-                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex_style);
-                }
-            }
-        }
     }
 
     #[cfg(all(target_os = "linux", feature = "x11"))]
@@ -516,7 +478,7 @@ fn reposition_and_anchor_window(ui: &AppWindow) {
 
             #[cfg(target_os = "windows")]
             {
-                use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+                use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER};
                 use i_slint_backend_winit::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
                 use windows_sys::Win32::Foundation::HWND;
 
@@ -529,9 +491,9 @@ fn reposition_and_anchor_window(ui: &AppWindow) {
                                 std::ptr::null_mut(),
                                 pos_x,
                                 pos_y,
-                                window_width,
-                                window_height,
-                                SWP_NOZORDER | SWP_NOACTIVATE,
+                                0,
+                                0,
+                                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSIZE,
                             );
                         }
                     }
