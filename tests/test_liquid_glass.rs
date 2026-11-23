@@ -66,7 +66,11 @@ fn test_liquid_glass_style_and_expansion() {
         ui.set_cfg_fixed_width(true);
         assert_eq!(ui.get_launcher_width(), 920.0 + 2.0 * shadow_margin);
         assert_eq!(ui.get_launcher_height(), 520.0 + shadow_margin);
+        assert_eq!(ui.get_launcher_radius(), 24.0);
+        ui.set_is_expanded(true);
+        assert_eq!(ui.get_launcher_height(), 520.0 + shadow_margin);
         assert_eq!(ui.get_launcher_radius(), 18.0);
+        ui.set_is_expanded(false);
         ui.set_cfg_fixed_width(false);
     }
 }

@@ -621,6 +621,17 @@ fn is_gnome_desktop() -> bool {
     false
 }
 
+fn show_launcher_window(ui: &AppWindow) -> Result<(), slint::PlatformError> {
+    let result = ui.show();
+    tiarun::search_index::set_indexing_paused(ui.window().is_visible());
+    result
+}
+
+fn hide_launcher_window(ui: &AppWindow) {
+    let _ = ui.hide();
+    tiarun::search_index::set_indexing_paused(ui.window().is_visible());
+}
+
 fn show_and_focus_launcher(
     ui: &AppWindow,
     ui_weak: slint::Weak<AppWindow>,
@@ -656,7 +667,7 @@ fn show_and_focus_launcher(
     if !was_visible {
         animate_window_pop_in(ui_weak.clone());
     }
-    let _ = ui.show();
+    let _ = show_launcher_window(ui);
     focus_launcher_window(ui);
     ui.invoke_focus_search();
     if !was_visible {
@@ -689,7 +700,7 @@ fn start_hyprland_focus_watcher(ui_handle: slint::Weak<AppWindow>, shown_instant
                                     if ui.window().is_visible() && !ui.get_in_settings_mode() {
                                         let elapsed = shown.read().map(|t| t.elapsed()).unwrap_or_default();
                                         if elapsed > Duration::from_millis(150) {
-                                            let _ = ui.hide();
+                                            hide_launcher_window(&ui);
                                             ui.set_search_text("".into());
                                             ui.set_is_expanded(false);
                                         }
@@ -706,15 +717,19 @@ fn start_hyprland_focus_watcher(ui_handle: slint::Weak<AppWindow>, shown_instant
 
 #[cfg(unix)]
 fn start_daemon_listener(
-    exit_trigger: Arc<AtomicBool>,
     ui_handle: slint::Weak<AppWindow>,
     shown_instant: Arc<std::sync::RwLock<Instant>>,
+    existing_listener: Option<UnixListener>,
 ) {
     let socket_path = get_socket_path();
-    let _ = std::fs::remove_file(&socket_path);
+    let listener_res = if let Some(l) = existing_listener {
+        Ok(l)
+    } else {
+        let _ = std::fs::remove_file(&socket_path);
+        UnixListener::bind(&socket_path)
+    };
 
-    if let Ok(listener) = UnixListener::bind(&socket_path) {
-        let path_clone = socket_path.clone();
+    if let Ok(listener) = listener_res {
         thread::spawn(move || {
             for stream in listener.incoming() {
                 if let Ok(mut stream) = stream {
@@ -723,10 +738,7 @@ fn start_daemon_listener(
                     let cmd = String::from_utf8_lossy(&buf[..n]);
 
                     if cmd.starts_with("quit") {
-                        let _ = std::fs::remove_file(&path_clone);
-                        let _ = slint::invoke_from_event_loop(|| {
-                            std::process::exit(0);
-                        });
+                        let _ = slint::quit_event_loop();
                         break;
                     }
 
@@ -778,15 +790,13 @@ fn start_daemon_listener(
                     }
 
                     let ui_weak = ui_handle.clone();
-                    let exit_flag = exit_trigger.clone();
                     let shown = shown_instant.clone();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(ui) = ui_weak.upgrade() {
                             let is_visible = ui.window().is_visible();
                             let is_focused = is_launcher_focused(&ui);
                             if is_visible && is_focused {
-                                exit_flag.store(true, Ordering::SeqCst);
-                                let _ = ui.hide();
+                                hide_launcher_window(&ui);
                             } else {
                                 show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
                             }
@@ -794,14 +804,12 @@ fn start_daemon_listener(
                     });
                 }
             }
-            let _ = std::fs::remove_file(&path_clone);
         });
     }
 }
 
 #[cfg(windows)]
 fn start_windows_global_hotkey(
-    exit_trigger: Arc<AtomicBool>,
     ui_handle: slint::Weak<AppWindow>,
     shown_instant: Arc<std::sync::RwLock<Instant>>,
 ) {
@@ -836,15 +844,13 @@ fn start_windows_global_hotkey(
         while unsafe { GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) } > 0 {
             if msg.message == WM_HOTKEY && msg.wParam == HOTKEY_ID_CTRL_ALT_SPACE as usize {
                 let ui_weak = ui_handle.clone();
-                let exit_flag = exit_trigger.clone();
                 let shown = shown_instant.clone();
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(ui) = ui_weak.upgrade() {
                         let is_visible = ui.window().is_visible();
                         let is_focused = is_launcher_focused(&ui);
                         if is_visible && is_focused {
-                            exit_flag.store(true, Ordering::SeqCst);
-                            let _ = ui.hide();
+                            hide_launcher_window(&ui);
                         } else {
                             show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
                         }
@@ -857,12 +863,11 @@ fn start_windows_global_hotkey(
 
 #[cfg(windows)]
 fn start_daemon_listener(
-    exit_trigger: Arc<AtomicBool>,
     ui_handle: slint::Weak<AppWindow>,
     shown_instant: Arc<std::sync::RwLock<Instant>>,
 ) {
     // 1. Native Win32 global hotkey thread (Ctrl + Alt + Space) with 0ms spawn latency
-    start_windows_global_hotkey(exit_trigger.clone(), ui_handle.clone(), shown_instant.clone());
+    start_windows_global_hotkey(ui_handle.clone(), shown_instant.clone());
 
     // 2. TCP listener for IPC toggle commands from external processes
     let addr: SocketAddr = "127.0.0.1:42425".parse().unwrap();
@@ -876,9 +881,7 @@ fn start_daemon_listener(
                     let cmd = String::from_utf8_lossy(&buf);
 
                     if cmd.starts_with("quit") {
-                        let _ = slint::invoke_from_event_loop(|| {
-                            std::process::exit(0);
-                        });
+                        let _ = slint::quit_event_loop();
                         break;
                     }
 
@@ -917,15 +920,13 @@ fn start_daemon_listener(
                     }
 
                     let ui_weak = ui_handle.clone();
-                    let exit_flag = exit_trigger.clone();
                     let shown = shown_instant.clone();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(ui) = ui_weak.upgrade() {
                             let is_visible = ui.window().is_visible();
                             let is_focused = is_launcher_focused(&ui);
                             if is_visible && is_focused {
-                                exit_flag.store(true, Ordering::SeqCst);
-                                let _ = ui.hide();
+                                hide_launcher_window(&ui);
                             } else {
                                 show_and_focus_launcher(&ui, ui_weak.clone(), &shown, "");
                             }
@@ -1817,10 +1818,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return run_dmenu_mode(&prompt);
     }
 
-    let is_daemon = args.iter().any(|a| a == "--daemon" || a == "-b" || a == "--background");
+    let mut is_daemon = args.iter().any(|a| a == "--daemon" || a == "-b" || a == "--background");
 
     let non_flag_args: Vec<&String> = args.iter().skip(1).filter(|a| !a.starts_with('-')).collect();
-    let initial_query = if !non_flag_args.is_empty() {
+    let mut initial_query = if !non_flag_args.is_empty() {
         let q = non_flag_args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
         Some(q)
     } else {
@@ -1842,7 +1843,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let exit_trigger = Arc::new(AtomicBool::new(false));
+    let config = Config::load();
+    let search_index = Arc::new(tiarun::search_index::SearchIndexEngine::for_config(&config));
+    let indexing_stop = Arc::new(AtomicBool::new(false));
+    if let Err(error) = search_index.start_crawler(indexing_stop.clone()) {
+        eprintln!("[tiarun-crawler] Failed to start: {error}");
+    }
+
+    #[cfg(unix)]
+    let mut daemon_listener = None;
+
+    #[cfg(unix)]
+    if is_daemon {
+        let socket_path = get_socket_path();
+        let _ = std::fs::remove_file(&socket_path);
+        if let Ok(listener) = UnixListener::bind(&socket_path) {
+            // Setup global shortcut and currency rate cache in background while idle
+            std::thread::spawn(|| {
+                tiarun::config::setup_global_shortcut();
+            });
+            tiarun::calc::init_currency_rates();
+
+            // Quiet resident daemon: do NOT create any window, GPU context, or Wayland surface
+            // at startup. Block silently on the socket until the user actually summons the launcher.
+            loop {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    let mut buf = [0u8; 512];
+                    let n = stream.read(&mut buf).unwrap_or(0);
+                    let cmd = String::from_utf8_lossy(&buf[..n]);
+
+                    if cmd.starts_with("quit") {
+                        indexing_stop.store(true, Ordering::Relaxed);
+                        let _ = std::fs::remove_file(&socket_path);
+                        return Ok(());
+                    }
+                    if cmd.starts_with("ping") {
+                        continue;
+                    }
+                    if let Some(query) = cmd.strip_prefix("query:") {
+                        initial_query = Some(query.trim().to_string());
+                    }
+                    // For "toggle" or "settings" or query, wake up and instantiate window!
+                    break;
+                }
+            }
+            daemon_listener = Some(listener);
+            is_daemon = false;
+        }
+    }
 
     // Identify this window to the compositor/WM as "tiarun" so Wayland
     // (app_id) and X11 (WM_CLASS) window managers can match it to the installed
@@ -1860,7 +1908,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let shown_instant = Arc::new(std::sync::RwLock::new(Instant::now()));
 
     // 2. Start background socket listener for instant wakeup
-    start_daemon_listener(exit_trigger.clone(), ui.as_weak(), shown_instant.clone());
+    #[cfg(unix)]
+    start_daemon_listener(ui.as_weak(), shown_instant.clone(), daemon_listener);
+    #[cfg(windows)]
+    start_daemon_listener(ui.as_weak(), shown_instant.clone());
 
     #[cfg(all(unix, not(target_os = "macos")))]
     start_hyprland_focus_watcher(ui.as_weak(), shown_instant.clone());
@@ -1879,7 +1930,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let elapsed = shown.read().map(|t| t.elapsed()).unwrap_or_default();
                         if elapsed > std::time::Duration::from_millis(600) {
                             if !is_launcher_focused(&ui) {
-                                let _ = ui.hide();
+                                hide_launcher_window(&ui);
                                 ui.set_search_text("".into());
                                 ui.set_is_expanded(false);
                             }
@@ -1896,8 +1947,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     tiarun::calc::init_currency_rates();
 
-    // 3. Load Config & Initialize Engine
-    let config = Config::load();
+    // 3. Apply Config & Initialize Engine
     ui.set_cfg_autostart(tiarun::config::is_autostart_enabled());
     ui.set_cfg_show_icons(config.theme.show_icons.unwrap_or(true));
     ui.set_cfg_show_status_bar(config.theme.show_status_bar.unwrap_or(true));
@@ -1913,7 +1963,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.set_cfg_fixed_width(true);
     }
 
-    let engine = Arc::new(LauncherEngine::new(config));
+    let engine = Arc::new(LauncherEngine::with_search_index(config, search_index));
     let icon_resolver = Arc::new(IconResolver::new());
 
     let categories: Vec<slint::SharedString> = engine
@@ -2622,7 +2672,7 @@ fn step_out_directory(
                 }
 
                 if let Some(ui) = ui_weak.upgrade() {
-                    let _ = ui.hide();
+                    hide_launcher_window(&ui);
                     ui.set_search_text("".into());
                     ui.set_active_scope("apps".into());
                     ui.set_is_expanded(false);
@@ -2650,7 +2700,7 @@ fn step_out_directory(
 
             if let Some(item) = item_opt {
                 if let Some(ui) = ui_weak.upgrade() {
-                    let _ = ui.hide();
+                    hide_launcher_window(&ui);
                     ui.set_search_text("".into());
                     ui.set_active_scope("apps".into());
                     ui.set_is_expanded(false);
@@ -2802,7 +2852,7 @@ fn step_out_directory(
         let ui_weak = ui.as_weak();
         ui.on_close_window(move || {
             if let Some(ui) = ui_weak.upgrade() {
-                let _ = ui.hide();
+                hide_launcher_window(&ui);
                 ui.set_search_text("".into());
                 ui.set_active_scope("apps".into());
                 ui.set_is_expanded(false);
@@ -2810,6 +2860,14 @@ fn step_out_directory(
             }
         });
     }
+
+    let ui_weak = ui.as_weak();
+    ui.window().on_close_requested(move || {
+        if let Some(ui) = ui_weak.upgrade() {
+            ui.invoke_close_window();
+        }
+        slint::CloseRequestResponse::KeepWindowShown
+    });
 
     // 10.1 Native Window Dragging on Wayland / X11 / Windows
     {
@@ -2859,7 +2917,7 @@ fn step_out_directory(
             ui.invoke_search_text_changed(q.clone().into());
         }
         animate_window_pop_in(ui.as_weak());
-        ui.show()?;
+        show_launcher_window(&ui)?;
         focus_launcher_window(&ui);
         ui.invoke_focus_search();
         let ui_w = ui.as_weak();
@@ -2869,7 +2927,8 @@ fn step_out_directory(
             }
         });
     }
-    slint::run_event_loop_until_quit()?;
+    let result = slint::run_event_loop_until_quit();
+    indexing_stop.store(true, Ordering::Relaxed);
 
     // Cleanup socket on exit
     #[cfg(unix)]
@@ -2878,5 +2937,6 @@ fn step_out_directory(
         let _ = std::fs::remove_file(&socket_path);
     }
 
+    result?;
     Ok(())
 }

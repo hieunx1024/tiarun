@@ -14,4 +14,5 @@ pub mod system_actions;
 pub mod plugins;
 pub mod file_watcher;
 pub mod content_search;
+pub mod search_index;
 pub mod file_preview;

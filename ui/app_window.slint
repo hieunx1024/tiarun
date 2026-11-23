@@ -20,7 +20,7 @@ export component AppWindow inherits Window {
     property <length> panel_base_width: root.cfg_fixed_width ? Theme.panel_width :
         ((root.is_showing_list && !root.in_settings_mode) ? Theme.panel_width : Theme.pill_width);
     out property <length> launcher_width: root.panel_base_width + 2 * root.shadow_margin;
-    out property <length> launcher_height: root.content_height + root.shadow_margin;
+    out property <length> launcher_height: root.cfg_fixed_width ? (Theme.panel_height + root.shadow_margin) : (root.content_height + root.shadow_margin);
     out property <length> launcher_radius: root.is_showing_list ? Theme.panel_radius : Theme.pill_radius;
     default-font-family: "Noto Sans";
     default-font-size: 19px;
@@ -64,7 +64,6 @@ export component AppWindow inherits Window {
     in-out property <bool> is_showing_list: root.in_settings_mode
         || root.search_text != ""
         || root.is_expanded
-        || root.cfg_fixed_width
         || (!root.cfg_compact_empty && root.cfg_view_style != "liquid_glass");
 
     // Action Vector Icons
@@ -337,6 +336,17 @@ export component AppWindow inherits Window {
         }
         copy_path(idx) => {
             root.copy_path(idx);
+        }
+    }
+
+    // Transparent click-outside dismiss area when collapsed on fixed-geometry window (GNOME Wayland)
+    if (!root.is_showing_list && root.cfg_fixed_width) : TouchArea {
+        x: 0px;
+        y: root.content_height;
+        width: 100%;
+        height: Math.max(0px, root.launcher_height - root.content_height);
+        clicked => {
+            root.close_window();
         }
     }
 

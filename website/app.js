@@ -1,462 +1,235 @@
-/**
- * TiaRun — Official Website Interactive Controller
- * Architecture: Vanilla JavaScript (Zero Dependencies, ES6+)
- * Performance: Lightweight, Non-blocking, Progressive Enhancement
- */
+'use strict';
 
-(function () {
-  'use strict';
+const REPO_URL = 'https://github.com/hieunx1024/tiarun';
+const SITE_THEME_KEY = 'tiarun-site-theme';
+const GALLERY_THEME_KEY = 'tiarun-gallery-theme';
 
-  const GITHUB_REPO = 'hieunx1024/tiarun';
-
-  // Global state for detected OS and latest release
-  let currentDetectedOS = null;
-  let currentLatestVersion = 'v1.0.0';
-  const directDownloadUrls = {};
-
-  /* ==========================================================================
-     1. Global Site Theme Controller (Dark / Light)
-     ========================================================================== */
-  function initSiteTheme() {
-    const toggleBtn = document.getElementById('theme-toggle-btn');
-    const root = document.documentElement;
-    const STORAGE_KEY = 'tiarun-site-theme';
-
-    const savedTheme = localStorage.getItem(STORAGE_KEY);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-
-    function applyTheme(theme) {
-      root.setAttribute('data-theme', theme);
-      if (toggleBtn) {
-        const isDark = theme === 'dark';
-        toggleBtn.setAttribute('aria-label', isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối');
-        toggleBtn.setAttribute('title', isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối');
-      }
-    }
-
-    applyTheme(initialTheme);
-
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => {
-        const currentTheme = root.getAttribute('data-theme') || 'dark';
-        const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        applyTheme(nextTheme);
-        localStorage.setItem(STORAGE_KEY, nextTheme);
-
-        if (!localStorage.getItem('tiarun-gallery-theme')) {
-          setGalleryTheme(nextTheme, false);
-        }
-      });
-    }
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        const systemTheme = e.matches ? 'dark' : 'light';
-        applyTheme(systemTheme);
-        if (!localStorage.getItem('tiarun-gallery-theme')) {
-          setGalleryTheme(systemTheme, false);
-        }
-      }
-    });
-  }
-
-  /* ==========================================================================
-     2. Gallery Segmented Control & Preview Theme
-     ========================================================================== */
-  function setGalleryTheme(theme, save = true) {
-    const gallery = document.getElementById('gallery');
-    const btnDark = document.getElementById('btn-theme-dark');
-    const btnLight = document.getElementById('btn-theme-light');
-    if (!gallery) return;
-
-    gallery.setAttribute('data-gallery-theme', theme);
-
-    if (btnDark && btnLight) {
-      if (theme === 'dark') {
-        btnDark.classList.add('active');
-        btnDark.setAttribute('aria-pressed', 'true');
-        btnLight.classList.remove('active');
-        btnLight.setAttribute('aria-pressed', 'false');
-      } else {
-        btnLight.classList.add('active');
-        btnLight.setAttribute('aria-pressed', 'true');
-        btnDark.classList.remove('active');
-        btnDark.setAttribute('aria-pressed', 'false');
-      }
-    }
-
-    if (save) {
-      localStorage.setItem('tiarun-gallery-theme', theme);
-    }
-  }
-
-  function initGalleryTheme() {
-    const btnDark = document.getElementById('btn-theme-dark');
-    const btnLight = document.getElementById('btn-theme-light');
-
-    const savedGalleryTheme = localStorage.getItem('tiarun-gallery-theme');
-    const currentSiteTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-    const initialTheme = savedGalleryTheme || currentSiteTheme;
-
-    setGalleryTheme(initialTheme, false);
-
-    if (btnDark) {
-      btnDark.addEventListener('click', () => setGalleryTheme('dark', true));
-    }
-    if (btnLight) {
-      btnLight.addEventListener('click', () => setGalleryTheme('light', true));
-    }
-  }
-
-  /* ==========================================================================
-     3. Gallery Tabs Scroll & Keyboard Navigation
-     ========================================================================== */
-  function initGalleryTabs() {
-    const tabRadios = document.querySelectorAll('.tab-radio');
-    const tabLabels = document.querySelectorAll('.tab-label');
-
-    function scrollLabelIntoView(label) {
-      if (!label) return;
-      label.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-
-    tabRadios.forEach((radio) => {
-      radio.addEventListener('change', () => {
-        if (!radio.checked) return;
-        const matchingLabel = document.querySelector(`label[for="${radio.id}"]`);
-        scrollLabelIntoView(matchingLabel);
-      });
-    });
-
-    tabLabels.forEach((label) => {
-      label.addEventListener('click', () => {
-        requestAnimationFrame(() => scrollLabelIntoView(label));
-      });
-
-      label.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          const targetId = label.getAttribute('for');
-          const targetRadio = document.getElementById(targetId);
-          if (targetRadio) {
-            targetRadio.checked = true;
-            targetRadio.dispatchEvent(new Event('change'));
-            scrollLabelIntoView(label);
-          }
-        }
-      });
-    });
-  }
-
-  /* ==========================================================================
-     4. Usage Interactive Commands (Click to Inspect on Gallery)
-     ========================================================================== */
-  function initCommandInspector() {
-    const commandRows = document.querySelectorAll('.command-row[data-target-tab]');
-    const galleryEl = document.getElementById('gallery');
-
-    function activateTab(tabKey) {
-      const radio = document.getElementById(`example-${tabKey}`);
-      if (!radio) return;
-
-      radio.checked = true;
-      radio.dispatchEvent(new Event('change'));
-
-      const matchingLabel = document.querySelector(`label[for="example-${tabKey}"]`);
-      if (matchingLabel) {
-        matchingLabel.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
-
-      if (galleryEl) {
-        galleryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-
-    commandRows.forEach((row) => {
-      const tabKey = row.dataset.targetTab;
-      if (!tabKey) return;
-
-      row.addEventListener('click', () => activateTab(tabKey));
-
-      row.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          activateTab(tabKey);
-        }
-      });
-    });
-  }
-
-  /* ==========================================================================
-     5. Multi-Layer Client OS Detection & Auto-Adaptation
-     ========================================================================== */
-  function detectClientOS() {
-    // 1. User-Agent Client Hints API (Chrome 90+, Edge, Brave, Opera)
-    if (navigator.userAgentData && navigator.userAgentData.platform) {
-      const p = navigator.userAgentData.platform.toLowerCase();
-      if (p.includes('win')) return 'windows';
-      if (p.includes('linux')) return 'linux';
-      if (p.includes('mac')) return 'mac';
-    }
-
-    // 2. Navigator platform & userAgent strings (Firefox, Safari, Linux desktop browsers)
-    const platform = (navigator.platform || '').toLowerCase();
-    const ua = (navigator.userAgent || '').toLowerCase();
-
-    if (platform.includes('win') || ua.includes('windows') || ua.includes('win32') || ua.includes('win64')) {
-      return 'windows';
-    }
-    if (platform.includes('linux') || platform.includes('x11') || ua.includes('linux') || ua.includes('x11') || ua.includes('ubuntu')) {
-      return 'linux';
-    }
-    if (platform.includes('mac') || ua.includes('macintosh') || ua.includes('mac os')) {
-      return 'mac';
-    }
-
+function readTheme(key) {
+  try {
+    const theme = localStorage.getItem(key);
+    return theme === 'light' || theme === 'dark' ? theme : null;
+  } catch {
     return null;
   }
+}
 
-  function applyOSAdaptation() {
-    currentDetectedOS = detectClientOS();
+function saveTheme(key, theme) {
+  try {
+    localStorage.setItem(key, theme);
+  } catch {
+    // Keep the selection for this page when the browser blocks storage.
+  }
+}
 
-    const badgeWin = document.getElementById('badge-windows');
-    const cardWin = document.getElementById('card-windows');
-    const badgeLinux = document.getElementById('badge-linux');
-    const cardLinux = document.getElementById('card-linux');
-    const btnExe = document.querySelector('[data-package="exe"]');
-    const btnDeb = document.querySelector('[data-package="deb"]');
+function initThemes() {
+  const root = document.documentElement;
+  const toggle = document.querySelector('#theme-toggle');
+  const preference = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosenTheme = readTheme(SITE_THEME_KEY);
+  const systemTheme = () => preference.matches ? 'dark' : 'light';
 
-    // 1. Reset everything first (clean state)
-    if (badgeWin) badgeWin.hidden = true;
-    if (badgeLinux) badgeLinux.hidden = true;
-    if (cardWin) cardWin.classList.remove('highlighted-os');
-    if (cardLinux) cardLinux.classList.remove('highlighted-os');
-
-    // 2. Adjust button styles and card highlights based strictly on detected OS
-    if (currentDetectedOS === 'windows') {
-      if (badgeWin) badgeWin.hidden = false;
-      if (cardWin) cardWin.classList.add('highlighted-os');
-
-      // Windows primary, Linux secondary
-      if (btnExe) {
-        btnExe.classList.add('primary');
-        btnExe.classList.remove('secondary');
-      }
-      if (btnDeb) {
-        btnDeb.classList.add('secondary');
-        btnDeb.classList.remove('primary');
-      }
-    } else if (currentDetectedOS === 'linux') {
-      if (badgeLinux) badgeLinux.hidden = false;
-      if (cardLinux) cardLinux.classList.add('highlighted-os');
-
-      // Linux primary, Windows secondary
-      if (btnDeb) {
-        btnDeb.classList.add('primary');
-        btnDeb.classList.remove('secondary');
-      }
-      if (btnExe) {
-        btnExe.classList.add('secondary');
-        btnExe.classList.remove('primary');
-      }
-    } else {
-      // Other OS (macOS, mobile, unknown): both badges stay hidden, both buttons neutral
-      if (btnExe) {
-        btnExe.classList.add('secondary');
-        btnExe.classList.remove('primary');
-      }
-      if (btnDeb) {
-        btnDeb.classList.add('secondary');
-        btnDeb.classList.remove('primary');
-      }
-    }
-
-    // 3. Update Hero CTA and hint based on detected OS
-    updateHeroCTA();
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+    const label = theme === 'dark' ? 'Chuyển trang sang giao diện sáng' : 'Chuyển trang sang giao diện tối';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
   }
 
-  function updateHeroCTA() {
-    const heroBtn = document.querySelector('.hero-download-btn');
-    const heroBtnText = document.querySelector('.hero-download-text');
-    const heroHint = document.getElementById('hero-os-hint');
+  applyTheme(chosenTheme || systemTheme());
 
-    if (!heroBtn || !heroBtnText) return;
+  const gallery = initGallery();
+  toggle.hidden = false;
 
-    if (currentDetectedOS === 'linux') {
-      heroBtnText.textContent = `Tải cho Linux (.deb) · ${currentLatestVersion}`;
-      if (directDownloadUrls.deb) {
-        heroBtn.href = directDownloadUrls.deb;
-      } else {
-        heroBtn.href = '#card-linux';
-      }
-      if (heroHint) {
-        heroHint.textContent = 'Đang mở trên Linux (x86-64). Có cả bản cho Windows.';
-        heroHint.hidden = false;
-      }
-    } else if (currentDetectedOS === 'windows') {
-      heroBtnText.textContent = `Tải cho Windows (.exe) · ${currentLatestVersion}`;
-      if (directDownloadUrls.exe) {
-        heroBtn.href = directDownloadUrls.exe;
-      } else {
-        heroBtn.href = '#card-windows';
-      }
-      if (heroHint) {
-        heroHint.textContent = 'Đang mở trên Windows (x86-64). Có cả bản cho Linux.';
-        heroHint.hidden = false;
-      }
-    } else {
-      heroBtnText.textContent = `Tải TiaRun ${currentLatestVersion}`;
-      heroBtn.href = '#download';
-      if (heroHint) heroHint.hidden = true;
-    }
+  function applyPageTheme(theme) {
+    applyTheme(theme);
+    gallery.followPageTheme();
   }
 
-  /* ==========================================================================
-     6. GitHub Releases API & Dynamic Assets Resolution
-     ========================================================================== */
-  function formatBytes(bytes) {
-    if (!bytes || isNaN(bytes)) return '';
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(1)} MB`;
-  }
+  toggle.addEventListener('click', () => {
+    chosenTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    saveTheme(SITE_THEME_KEY, chosenTheme);
+    applyPageTheme(chosenTheme);
+  });
 
-  async function resolveReleaseData() {
-    const packageRules = {
-      exe: {
-        pattern: /^tiarun-setup\.exe$/,
-        sizeElemId: 'size-exe',
-        formatSize: (s) => `· ${s}`,
-      },
-      zip: {
-        pattern: /^tiarun-windows-x86_64\.zip$/,
-        sizeElemId: 'size-zip',
-        formatSize: (s) => `(${s})`,
-      },
-      deb: {
-        pattern: /^tiarun_[\w.+~-]+_amd64\.deb$/,
-        sizeElemId: 'size-deb',
-        formatSize: (s) => `· ${s}`,
-      },
-      tar: {
-        pattern: /^tiarun-linux-x86_64\.tar\.gz$/,
-        sizeElemId: 'size-tar',
-        formatSize: (s) => `(${s})`,
-      },
-    };
+  preference.addEventListener('change', () => {
+    if (!chosenTheme) applyPageTheme(systemTheme());
+  });
+}
 
-    try {
-      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
-      if (!response.ok) return;
+function initGallery() {
+  const tablist = document.querySelector('.gallery-tabs');
+  const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+  const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')));
+  const themeOptions = document.querySelector('.theme-options');
+  const themeButtons = [...themeOptions.querySelectorAll('button')];
+  const compact = window.matchMedia('(max-width: 48rem)');
+  let activeIndex = 0;
+  let chosenTheme = readTheme(GALLERY_THEME_KEY);
 
-      const release = await response.json();
-      if (!release) return;
+  function updateImage() {
+    const theme = chosenTheme || document.documentElement.dataset.theme;
+    const panel = panels[activeIndex];
+    const key = panel.id.slice('panel-'.length);
+    const image = panel.querySelector('img');
+    const source = `assets/demo-${key}-${theme}.webp`;
+    if (image.getAttribute('src') !== source) image.src = source;
 
-      // 1. Update Version Badges
-      const versionTag = release.tag_name || release.name;
-      if (versionTag) {
-        currentLatestVersion = versionTag;
-        const badge = document.getElementById('release-version-badge');
-        if (badge) badge.textContent = versionTag;
-      }
-
-      // 2. Match Release Assets
-      if (Array.isArray(release.assets)) {
-        for (const [pkgKey, rule] of Object.entries(packageRules)) {
-          const asset = release.assets.find(
-            ({ name, browser_download_url: url }) =>
-              rule.pattern.test(name) &&
-              /^https:\/\/github\.com\/hieunx1024\/tiarun\/releases\/download\/[^/]+\/[^/]+$/.test(url)
-          );
-
-          if (!asset) continue;
-
-          // Save direct download URL for Hero & Card links
-          directDownloadUrls[pkgKey] = asset.browser_download_url;
-
-          // Update download card links
-          const link = document.querySelector(`[data-package="${pkgKey}"]`);
-          if (link) {
-            link.href = asset.browser_download_url;
-          }
-
-          // Update dynamic file size display
-          if (rule.sizeElemId && asset.size) {
-            const sizeElem = document.getElementById(rule.sizeElemId);
-            if (sizeElem) {
-              const formatted = formatBytes(asset.size);
-              sizeElem.textContent = rule.formatSize(formatted);
-            }
-          }
-        }
-      }
-
-      // Re-apply Hero CTA with resolved version & direct URLs
-      updateHeroCTA();
-    } catch (err) {
-      // Graceful degradation: static default links remain functional if GitHub API is offline or rate-limited.
-    }
-  }
-
-  /* ==========================================================================
-     7. Community Donation Dialog Controller
-     ========================================================================== */
-  function initDonateModal() {
-    const dialog = document.getElementById('donate-dialog');
-    const openBtn = document.getElementById('btn-open-donate');
-    const closeBtn = document.getElementById('btn-close-donate');
-
-    if (!dialog) return;
-
-    if (openBtn) {
-      openBtn.addEventListener('click', () => {
-        if (typeof dialog.showModal === 'function') {
-          dialog.showModal();
-        } else {
-          dialog.setAttribute('open', '');
-        }
-      });
-    }
-
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        if (typeof dialog.close === 'function') {
-          dialog.close();
-        } else {
-          dialog.removeAttribute('open');
-        }
-      });
-    }
-
-    // Close when clicking outside modal contents (on the backdrop)
-    dialog.addEventListener('click', (event) => {
-      const rect = dialog.getBoundingClientRect();
-      const isInDialog = (
-        rect.top <= event.clientY &&
-        event.clientY <= rect.top + rect.height &&
-        rect.left <= event.clientX &&
-        event.clientX <= rect.left + rect.width
-      );
-      if (!isInDialog) {
-        if (typeof dialog.close === 'function') {
-          dialog.close();
-        } else {
-          dialog.removeAttribute('open');
-        }
-      }
+    themeButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.galleryTheme === theme));
     });
   }
 
-  /* ==========================================================================
-     DOM Ready Initialization
-     ========================================================================== */
-  document.addEventListener('DOMContentLoaded', () => {
-    initSiteTheme();
-    initGalleryTheme();
-    initGalleryTabs();
-    initCommandInspector();
-    applyOSAdaptation();
-    resolveReleaseData();
-    initDonateModal();
+  function activate(index, moveFocus) {
+    tabs[activeIndex].setAttribute('aria-selected', 'false');
+    tabs[activeIndex].tabIndex = -1;
+    panels[activeIndex].hidden = true;
+
+    activeIndex = index;
+    const tab = tabs[index];
+    tab.setAttribute('aria-selected', 'true');
+    tab.tabIndex = 0;
+    updateImage();
+    panels[index].hidden = false;
+    if (moveFocus) tab.focus();
+  }
+
+  function updateOrientation() {
+    tablist.setAttribute('aria-orientation', compact.matches ? 'horizontal' : 'vertical');
+  }
+
+  panels.forEach((panel, index) => {
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', tabs[index].id);
+    panel.tabIndex = 0;
   });
-})();
+
+  tabs.forEach((tab, index) => tab.addEventListener('click', () => activate(index, false)));
+
+  tablist.addEventListener('keydown', (event) => {
+    const previousKey = compact.matches ? 'ArrowLeft' : 'ArrowUp';
+    const nextKey = compact.matches ? 'ArrowRight' : 'ArrowDown';
+    const lastIndex = tabs.length - 1;
+    let targetIndex = activeIndex;
+
+    switch (event.key) {
+      case 'Home': targetIndex = 0; break;
+      case 'End': targetIndex = lastIndex; break;
+      case previousKey: targetIndex = activeIndex === 0 ? lastIndex : activeIndex - 1; break;
+      case nextKey: targetIndex = activeIndex === lastIndex ? 0 : activeIndex + 1; break;
+      default: return;
+    }
+
+    event.preventDefault();
+    activate(targetIndex, true);
+  });
+
+  themeButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      chosenTheme = button.dataset.galleryTheme;
+      saveTheme(GALLERY_THEME_KEY, chosenTheme);
+      updateImage();
+    });
+  });
+
+  compact.addEventListener('change', updateOrientation);
+  updateOrientation();
+  updateImage();
+  tablist.hidden = false;
+  themeOptions.hidden = false;
+
+  return { followPageTheme: updateImage };
+}
+
+function showPlatformDownload() {
+  const agent = navigator.userAgent || '';
+  const hints = navigator.userAgentData;
+  const platform = hints?.platform || navigator.platform || '';
+  if (hints?.mobile || /Android|iPhone|iPad|iPod|CrOS/i.test(agent)) return;
+
+  let target;
+  let label;
+  if (/^win/i.test(platform) || /Windows NT/i.test(agent)) {
+    target = 'card-windows';
+    label = 'Tải cho Windows';
+  } else if (/linux|^x11/i.test(platform) || /X11;.*Linux/i.test(agent)) {
+    target = 'card-linux';
+    label = 'Tải cho Linux';
+  } else {
+    return;
+  }
+
+  const link = document.querySelector('#hero-download');
+  link.href = `#${target}`;
+  link.querySelector('span').textContent = label;
+  document.getElementById(target).classList.add('is-current-platform');
+}
+
+const packagePatterns = {
+  exe: /^tiarun-setup\.exe$/,
+  zip: /^tiarun-windows-x86_64\.zip$/,
+  deb: /^tiarun_[\w.+~-]+_amd64\.deb$/,
+  tar: /^tiarun-linux-x86_64\.tar\.gz$/,
+};
+
+const sizeFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
+
+async function updateDownloads() {
+  try {
+    const response = await fetch('https://api.github.com/repos/hieunx1024/tiarun/releases/latest');
+    if (!response.ok) return;
+
+    const release = await response.json();
+    if (!release || !/^v?\d+\.\d+\.\d+(?:[.+-][\w.-]+)?$/.test(release.tag_name)) return;
+
+    const tag = release.tag_name;
+    const baseDownload = `${REPO_URL}/releases/download/${encodeURIComponent(tag)}/`;
+    const version = document.querySelector('#release-version');
+    version.textContent = tag;
+    version.hidden = false;
+    document.querySelector('#release-link').href = `${REPO_URL}/releases/tag/${encodeURIComponent(tag)}`;
+
+    if (!Array.isArray(release.assets)) return;
+    document.querySelectorAll('[data-package]').forEach((link) => {
+      const pattern = packagePatterns[link.dataset.package];
+      const asset = release.assets.find((item) =>
+        item && pattern.test(item.name) &&
+        item.browser_download_url === baseDownload + encodeURIComponent(item.name)
+      );
+      if (!asset) return;
+
+      link.href = asset.browser_download_url;
+      link.querySelector('span').textContent = link.dataset.downloadLabel;
+      if (Number.isFinite(asset.size) && asset.size > 0) {
+        const size = link.querySelector('small');
+        size.textContent = `${sizeFormat.format(asset.size / 1024 ** 2)} MiB`;
+        size.hidden = false;
+      }
+    });
+  } catch {
+    // The links in the HTML lead to the latest release if the API is unavailable.
+  }
+}
+
+function initDonateDialog() {
+  const dialog = document.querySelector('#donate-dialog');
+  if (typeof dialog.showModal !== 'function') return;
+
+  document.querySelector('#donate-link').addEventListener('click', (event) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    dialog.showModal();
+  });
+
+  dialog.addEventListener('click', (event) => {
+    if (event.target !== dialog) return;
+    const { left, right, top, bottom } = dialog.getBoundingClientRect();
+    if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) {
+      dialog.close();
+    }
+  });
+}
+
+initThemes();
+showPlatformDownload();
+updateDownloads();
+initDonateDialog();

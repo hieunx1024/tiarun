@@ -150,6 +150,7 @@ pub struct LauncherEngine {
     pub shallow_files: Arc<RwLock<Vec<LauncherItem>>>,
     pub history: Arc<RwLock<HistoryManager>>,
     pub clipboard: Arc<crate::clipboard::ClipboardManager>,
+    pub search_index: Arc<crate::search_index::SearchIndexEngine>,
     matcher: SkimMatcherV2,
     pub config: Config,
     pub file_watcher: Option<crate::file_watcher::FileWatcher>,
@@ -157,6 +158,14 @@ pub struct LauncherEngine {
 
 impl LauncherEngine {
     pub fn new(config: Config) -> Self {
+        let search_index = Arc::new(crate::search_index::SearchIndexEngine::for_config(&config));
+        Self::with_search_index(config, search_index)
+    }
+
+    pub fn with_search_index(
+        config: Config,
+        search_index: Arc<crate::search_index::SearchIndexEngine>,
+    ) -> Self {
         let history = Arc::new(RwLock::new(HistoryManager::load()));
         let clipboard = Arc::new(crate::clipboard::ClipboardManager::new());
         let shallow_files = Arc::new(RwLock::new(Vec::new()));
@@ -170,6 +179,7 @@ impl LauncherEngine {
             shallow_files,
             history,
             clipboard,
+            search_index,
             matcher: SkimMatcherV2::default(),
             config: config.clone(),
             file_watcher,
@@ -1125,6 +1135,33 @@ impl LauncherEngine {
                 })
                 .collect();
 
+            // Supplement with deep files indexed in SQLite FTS5 database
+            let indexed_file_matches = self.search_index.search_files(file_query, 30);
+            for ifm in indexed_file_matches {
+                if !matches.iter().any(|((item, _), _)| item.exec_or_path == ifm.path) {
+                    let desc = Path::new(&ifm.path).parent().map(|p| {
+                        let s = p.to_string_lossy().to_string();
+                        if let Some(home) = dirs::home_dir() {
+                            let home_str = home.to_string_lossy().to_string();
+                            if s.starts_with(&home_str) {
+                                return s.replacen(&home_str, "~", 1);
+                            }
+                        }
+                        s
+                    });
+                    let item = LauncherItem::new(
+                        ifm.filename,
+                        ifm.path.clone(),
+                        ItemType::File,
+                        desc,
+                        false,
+                        None,
+                    );
+                    let boost = history_guard.get_boost(&ifm.path);
+                    matches.push(((item, Vec::new()), 200 + boost));
+                }
+            }
+
             matches.sort_by(|a, b| b.1.cmp(&a.1));
             for (item_with_indices, _) in matches {
                 results.push(item_with_indices);
@@ -1170,11 +1207,26 @@ impl LauncherEngine {
                 return results;
             }
 
+            if content_query.chars().count() < 2 {
+                results.push((
+                    LauncherItem::new(
+                        "File Content Search".to_string(),
+                        "@t".to_string(),
+                        ItemType::Calc,
+                        Some("Type at least 2 characters to search text inside files...".to_string()),
+                        false,
+                        Some("text-x-generic".to_string()),
+                    ),
+                    Vec::new(),
+                ));
+                return results;
+            }
+
             drop(shallow_files_guard);
             drop(history_guard);
-            let matches = crate::content_search::ContentSearchEngine::search_until_cancelled(
+
+            let matches = self.search_index.search_content(
                 content_query,
-                &self.config,
                 self.config.search.max_results,
                 cancelled,
             );

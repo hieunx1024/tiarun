@@ -5,15 +5,7 @@ use rayon::prelude::*;
 use walkdir::WalkDir;
 use crate::config::Config;
 use crate::launcher::{remove_vietnamese_accents, ItemType, LauncherItem};
-
-/// Critical directories that must NEVER be walked for content search to prevent
-/// huge build artifact dumps (like node_modules, target, .git) from eating the search budget.
-pub const HARD_IGNORED_DIRS: &[&str] = &[
-    "node_modules", ".git", "target", "build", "dist", ".cache",
-    "venv", ".venv", "__pycache__", ".cargo", ".rustup", ".local",
-    "AppData", ".Trash", ".Trash-1000", ".idea", ".vscode",
-    "vendor", "bin", "obj", ".next", ".nuxt",
-];
+use crate::search_index::{scope::SearchScope, search_words};
 
 #[derive(Debug, Clone)]
 pub struct ContentMatch {
@@ -236,75 +228,40 @@ impl ContentSearchEngine {
         max_results: usize,
         cancelled: &(impl Fn() -> bool + Sync),
     ) -> Vec<ContentMatch> {
-        let trimmed = query.trim();
-        if trimmed.is_empty() {
-            return Vec::new();
-        }
+        Self::search_in_scope(query, &SearchScope::new(&config.search), max_results, cancelled)
+    }
 
-        let words: Vec<String> = trimmed.split_whitespace().map(|s| s.to_lowercase()).collect();
-        if words.is_empty() {
+    pub(crate) fn search_in_scope(
+        query: &str,
+        scope: &SearchScope,
+        max_results: usize,
+        cancelled: &(impl Fn() -> bool + Sync),
+    ) -> Vec<ContentMatch> {
+        let words = search_words(query);
+        if words.is_empty() || max_results == 0 || cancelled() {
             return Vec::new();
         }
         let words_norm: Vec<String> = words.iter().map(|w| remove_vietnamese_accents(w).to_lowercase()).collect();
         let words_ref: Vec<&str> = words.iter().map(|s| s.as_str()).collect();
         let words_norm_ref: Vec<&str> = words_norm.iter().map(|s| s.as_str()).collect();
 
-        // Gather candidate directories (Documents, Desktop, Downloads, or config paths)
-        let mut target_dirs: Vec<PathBuf> = Vec::new();
-        if config.search.paths.is_empty() {
-            if let Some(docs) = dirs::document_dir() {
-                if docs.exists() { target_dirs.push(docs); }
-            }
-            if let Some(desk) = dirs::desktop_dir() {
-                if desk.exists() { target_dirs.push(desk); }
-            }
-            if let Some(down) = dirs::download_dir() {
-                if down.exists() { target_dirs.push(down); }
-            }
-        } else {
-            for p in &config.search.paths {
-                let path = PathBuf::from(crate::launcher::expand_tilde(&p.path));
-                if path.exists() {
-                    target_dirs.push(path);
-                }
-            }
-        }
-
-        let ignored_dirs = &config.search.ignored_dirs;
-        let ignored_exts = &config.search.ignored_extensions;
-
         // Collect candidate files (ignoring build folders like node_modules, target, etc.)
         let mut candidate_files: Vec<PathBuf> = Vec::new();
-        for dir in target_dirs {
+        'roots: for (dir, depth) in scope.fallback_roots() {
             for entry in WalkDir::new(dir)
-                .max_depth(6)
+                .max_depth(*depth)
                 .into_iter()
-                .filter_entry(|e| {
-                    if let Some(name) = e.file_name().to_str() {
-                        !name.starts_with('.')
-                            && !HARD_IGNORED_DIRS.contains(&name)
-                            && !ignored_dirs.iter().any(|ig| ig == name)
-                    } else {
-                        false
-                    }
-                })
+                .filter_entry(|entry| scope.allows_name(entry.path()))
                 .flatten()
             {
                 if cancelled() {
                     return Vec::new();
                 }
                 if candidate_files.len() >= 10000 {
-                    break;
+                    break 'roots;
                 }
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                        let ext_dot = format!(".{}", ext.to_lowercase());
-                        if ignored_exts.iter().any(|ig| ig.eq_ignore_ascii_case(&ext_dot) || ig.eq_ignore_ascii_case(ext)) {
-                            continue;
-                        }
-                    }
-                    candidate_files.push(path.to_path_buf());
+                if entry.file_type().is_file() && scope.allows_extension(entry.path()) {
+                    candidate_files.push(entry.into_path());
                 }
             }
         }

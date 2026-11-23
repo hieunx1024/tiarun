@@ -1,577 +1,315 @@
 <!doctype html>
-<html lang="vi" data-theme="dark">
+<html lang="vi">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>TiaRun — Launcher điều khiển bằng bàn phím cho Windows và Linux</title>
-  <meta name="description" content="Launcher điều khiển bằng bàn phím cho Windows và Linux. Khởi chạy ứng dụng, tìm file tiếng Việt không dấu, xem trước nội dung và tính toán trực tiếp từ thanh lệnh.">
-  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TiaRun — Launcher miễn phí cho Windows và Linux</title>
+  <meta name="description" content="Mở ứng dụng, tìm tệp tiếng Việt không dấu và tính nhanh ngay từ bàn phím. Tải TiaRun miễn phí cho Windows và Linux.">
+  <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
   <link rel="canonical" href="https://tiarun.vercel.app/">
-
-  <!-- Open Graph / Social Sharing -->
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TiaRun">
   <meta property="og:locale" content="vi_VN">
   <meta property="og:url" content="https://tiarun.vercel.app/">
-  <meta property="og:title" content="TiaRun — Launcher điều khiển bằng bàn phím cho Windows và Linux">
-  <meta property="og:description" content="Khởi chạy ứng dụng, tìm file tiếng Việt không dấu, xem trước nội dung và tính toán từ cùng một thanh lệnh cục bộ.">
+  <meta property="og:title" content="TiaRun — Mở ứng dụng và tìm tệp bằng bàn phím">
+  <meta property="og:description" content="Mở ứng dụng, tìm tệp tiếng Việt không dấu và tính nhanh từ một thanh lệnh. Miễn phí cho Windows và Linux.">
   <meta property="og:image" content="https://tiarun.vercel.app/assets/og-image.png">
-  <meta property="og:image:alt" content="Logo TiaRun">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="alternate icon" href="assets/favicon.ico">
-
-  <!-- Typography: Be Vietnam Pro (tối ưu tiếng Việt sắc nét) + JetBrains Mono -->
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="TiaRun và ảnh giao diện tìm kiếm và xem trước tệp">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="assets/tiarun-64.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="style.css?v=1.2.0">
-  <script src="app.js?v=1.2.0" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=5">
+  <script src="app.js?v=2" defer></script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "TiaRun",
+      "url": "https://tiarun.vercel.app/",
+      "description": "Launcher điều khiển bằng bàn phím, hỗ trợ tìm kiếm tiếng Việt không dấu.",
+      "operatingSystem": ["Windows", "Linux"],
+      "applicationCategory": "UtilitiesApplication",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": 0, "priceCurrency": "USD" },
+      "installUrl": "https://github.com/hieunx1024/tiarun/releases/latest",
+      "screenshot": "https://tiarun.vercel.app/assets/launcher-home.png"
+    }
+  </script>
 </head>
 <body id="top">
   <a class="skip-link" href="#main">Đến nội dung chính</a>
-
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="#top" aria-label="Trang chủ TiaRun">
-        <img src="assets/logo.svg" alt="" width="28" height="28" class="brand-logo">
-        <span class="brand-name">TiaRun</span>
+        <img src="assets/tiarun-64.png" width="34" height="34" alt="">
+        TiaRun
       </a>
-
       <nav class="site-nav" aria-label="Điều hướng chính">
-        <a href="#gallery" class="nav-link">Giao diện</a>
-        <a href="#usage" class="nav-link">Cú pháp</a>
-        <a href="#architecture" class="nav-link">Kỹ thuật</a>
-        <a href="#download" class="nav-link">Tải về</a>
+        <a href="#gallery">Tính năng</a>
+        <a href="#usage">Cách dùng</a>
+        <a href="https://github.com/hieunx1024/tiarun">GitHub</a>
       </nav>
-
       <div class="header-actions">
-        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-label="Chuyển giao diện sáng hoặc tối" title="Đổi giao diện sáng/tối">
-          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        <button type="button" class="icon-button theme-toggle" id="theme-toggle" hidden>
+          <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>
           </svg>
-          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+            <path d="M20.9 13.3A8.9 8.9 0 0 1 10.7 3.1 9 9 0 1 0 20.9 13.3Z"/>
           </svg>
         </button>
-
-        <a class="repo-link" href="https://github.com/hieunx1024/tiarun" target="_blank" rel="noopener noreferrer" aria-label="Mã nguồn TiaRun trên GitHub" title="GitHub">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-          </svg>
-        </a>
+        <a class="button header-download" href="#download">Tải xuống</a>
       </div>
     </div>
   </header>
 
   <main id="main">
-    <!-- Hero Section -->
     <section class="hero container" aria-labelledby="headline">
-      <div class="intro">
-        <div class="badge-pill">
-          <span class="badge-dot" aria-hidden="true"></span>
-          <span>Windows & Linux · Single-instance daemon</span>
-        </div>
-        <h1 id="headline">Khởi chạy ứng dụng và tìm kiếm từ bàn phím</h1>
-        <p class="lede">
-          Mở nhanh bằng phím tắt. Tự khớp tiếng Việt không dấu (gõ <code>tai lieu</code> ra <em>Tài liệu</em>), duyệt file kèm bảng xem trước, chuyển cửa sổ và lưu lịch sử clipboard hoàn toàn trên máy.
-        </p>
+      <div class="hero-copy">
+        <h1 id="headline">Mở ứng dụng và tìm tệp bằng bàn phím</h1>
+        <p class="lede">Tìm tệp tiếng Việt không dấu, xem trước nội dung và tính toán ngay trong thanh lệnh TiaRun.</p>
         <div class="hero-actions">
-          <a class="button primary hero-download-btn" href="#download">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span class="hero-download-text">Tải TiaRun v1.0.1</span>
+          <a class="button primary" id="hero-download" href="#download">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
+            <span>Tải TiaRun</span>
           </a>
-          <a class="button secondary" href="#usage">
-            <span>Xem bảng lệnh</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </a>
+          <a class="text-link" href="#gallery">Xem tính năng</a>
         </div>
-        <p class="hero-os-hint" id="hero-os-hint" hidden></p>
-        <div class="shortcut-banner">
-          <span class="shortcut-label">Phím tắt mặc định:</span>
-          <span class="keys">
-            <kbd>Ctrl</kbd><span class="key-sep">+</span><kbd>Alt</kbd><span class="key-sep">+</span><kbd>Space</kbd>
-          </span>
-        </div>
+        <p class="hero-meta">Windows và Linux (x86-64) · Miễn phí, mã nguồn mở MIT</p>
       </div>
 
-      <!-- Highlights strip: 4 real engineering points -->
-      <div class="highlights-grid" aria-label="Đặc tính kỹ thuật cốt lõi">
-        <div class="highlight-item">
-          <div class="highlight-title">Single-instance Daemon</div>
-          <p class="highlight-desc">Tiến trình nền chạy sẵn lắng nghe qua IPC. Cửa sổ mở ngay khi bấm phím tắt mà không khởi động lại GPU context.</p>
+      <figure class="hero-preview">
+        <div class="hero-screenshot">
+          <img src="assets/launcher-home.png" width="1028" height="583" alt="TiaRun với ô tìm kiếm trống, tab Apps đang mở và danh sách ứng dụng bên dưới" fetchpriority="high">
         </div>
-        <div class="highlight-item">
-          <div class="highlight-title">Tìm Kiếm Không Dấu</div>
-          <p class="highlight-desc">Thuật toán SkimMatcherV2 chuẩn hóa tiếng Việt: gõ <code>tai lieu</code> ra <em>Tài liệu</em>, <code>ke hoach</code> ra <em>Kế hoạch</em>.</p>
-        </div>
-        <div class="highlight-item">
-          <div class="highlight-title">Xem Trước & Quét Nội Dung</div>
-          <p class="highlight-desc">Gõ <code>@f</code> duyệt file kèm bảng xem trước; gõ <code>@t</code> quét nội dung bên trong file văn bản, mã nguồn và tài liệu Word (<code>.docx</code>).</p>
-        </div>
-        <div class="highlight-item">
-          <div class="highlight-title">Bộ Cài Đặt & Bản Portable</div>
-          <p class="highlight-desc">Hỗ trợ bộ cài tự động và bản nén chạy ngay cho cả Windows (setup / zip) lẫn Linux (<code>.deb</code> / tar.gz) kiến trúc x86-64.</p>
-        </div>
-      </div>
-
-      <!-- Interactive Gallery Section -->
-      <fieldset class="gallery" id="gallery" data-gallery-theme="dark">
-        <legend class="visually-hidden">Ảnh giao diện thực tế của TiaRun</legend>
-
-        <!-- Hidden Radio Inputs for Tab State (progressive enhancement) -->
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-apps" checked>
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-files">
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-text">
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-calc">
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-windows">
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-clipboard">
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-system">
-        <input class="visually-hidden tab-radio" type="radio" name="example" id="example-settings">
-
-        <!-- Window Mockup Frame Header -->
-        <div class="gallery-window-header">
-          <div class="window-decorations" aria-hidden="true">
-            <span class="window-dot dot-close"></span>
-            <span class="window-dot dot-min"></span>
-            <span class="window-dot dot-max"></span>
-          </div>
-
-          <div class="window-title-bar">
-            <span class="window-title-text">TiaRun</span>
-          </div>
-
-          <!-- Segmented Control for Gallery Theme (Tối | Sáng) -->
-          <div class="segmented-control" role="group" aria-label="Chế độ màu xem trước">
-            <button type="button" class="segment-btn active" data-theme-target="dark" id="btn-theme-dark" aria-pressed="true">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              <span>Tối</span>
-            </button>
-            <button type="button" class="segment-btn" data-theme-target="light" id="btn-theme-light" aria-pressed="false">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-              <span>Sáng</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 8 Tabs Bar (Horizontal scroll on mobile) -->
-        <div class="gallery-tabs-wrapper">
-          <div class="gallery-tabs" role="tablist" aria-label="Các chế độ hoạt động">
-            <label for="example-apps" role="tab" id="tab-apps" class="tab-label" tabindex="0">Ứng dụng</label>
-            <label for="example-files" role="tab" id="tab-files" class="tab-label" tabindex="0">File</label>
-            <label for="example-text" role="tab" id="tab-text" class="tab-label" tabindex="0">Nội dung</label>
-            <label for="example-calc" role="tab" id="tab-calc" class="tab-label" tabindex="0">Máy tính</label>
-            <label for="example-windows" role="tab" id="tab-windows" class="tab-label" tabindex="0">Cửa sổ</label>
-            <label for="example-clipboard" role="tab" id="tab-clipboard" class="tab-label" tabindex="0">Clipboard</label>
-            <label for="example-system" role="tab" id="tab-system" class="tab-label" tabindex="0">Hệ thống</label>
-            <label for="example-settings" role="tab" id="tab-settings" class="tab-label" tabindex="0">Cài đặt</label>
-          </div>
-        </div>
-
-        <!-- Visual Stage Content (8 Views) -->
-        <figure class="example apps" role="tabpanel" aria-labelledby="tab-apps">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-apps-dark.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm ứng dụng trên TiaRun giao diện tối" loading="eager">
-            <img class="img-light" src="assets/demo-apps-light.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm ứng dụng trên TiaRun giao diện sáng" loading="eager">
-          </div>
-          <figcaption>
-            Gõ tên ứng dụng không dấu rồi nhấn <kbd>Enter</kbd> để mở.
-          </figcaption>
-        </figure>
-
-        <figure class="example files" role="tabpanel" aria-labelledby="tab-files">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-files-dark.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm file và thư mục trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-files-light.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm file và thư mục trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Gõ <code>@f</code> để tìm file kèm bảng xem trước. Nhấn <kbd>→</kbd> để mở thư mục con.
-          </figcaption>
-        </figure>
-
-        <figure class="example text" role="tabpanel" aria-labelledby="tab-text">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-text-dark.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm nội dung văn bản bên trong file trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-text-light.webp?v=1.0.6" width="880" height="540" alt="Tìm kiếm nội dung văn bản bên trong file trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Gõ <code>@t</code> để tìm nội dung trong file văn bản, mã nguồn và tài liệu Word (<code>.docx</code>).
-          </figcaption>
-        </figure>
-
-        <figure class="example calc" role="tabpanel" aria-labelledby="tab-calc">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-calc-dark.webp?v=1.0.6" width="880" height="540" alt="Tính toán số học và đổi đơn vị trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-calc-light.webp?v=1.0.6" width="880" height="540" alt="Tính toán số học và đổi đơn vị trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Tính toán số học hoặc đổi đơn vị. Nhấn <kbd>Enter</kbd> để sao chép kết quả.
-          </figcaption>
-        </figure>
-
-        <figure class="example windows" role="tabpanel" aria-labelledby="tab-windows">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-windows-dark.webp?v=1.0.6" width="880" height="540" alt="Chuyển đổi cửa sổ đang mở trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-windows-light.webp?v=1.0.6" width="880" height="540" alt="Chuyển đổi cửa sổ đang mở trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Gõ <code>@w</code> để liệt kê và chuyển focus sang cửa sổ đang mở.
-          </figcaption>
-        </figure>
-
-        <figure class="example clipboard" role="tabpanel" aria-labelledby="tab-clipboard">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-clipboard-dark.webp?v=1.0.6" width="880" height="540" alt="Lịch sử clipboard trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-clipboard-light.webp?v=1.0.6" width="880" height="540" alt="Lịch sử clipboard trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Gõ <code>@c</code> để tìm lại và sao chép đoạn văn bản từ lịch sử clipboard.
-          </figcaption>
-        </figure>
-
-        <figure class="example system" role="tabpanel" aria-labelledby="tab-system">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-system-dark.webp?v=1.0.6" width="880" height="540" alt="Thao tác lệnh hệ thống trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-system-light.webp?v=1.0.6" width="880" height="540" alt="Thao tác lệnh hệ thống trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Gõ <code>@sys</code> để khóa màn hình, sleep, khởi động lại hoặc tắt máy.
-          </figcaption>
-        </figure>
-
-        <figure class="example settings" role="tabpanel" aria-labelledby="tab-settings">
-          <div class="example-stage">
-            <img class="img-dark" src="assets/demo-settings-dark.webp?v=1.0.6" width="880" height="540" alt="Bảng tùy chỉnh cài đặt trên TiaRun giao diện tối" loading="lazy">
-            <img class="img-light" src="assets/demo-settings-light.webp?v=1.0.6" width="880" height="540" alt="Bảng tùy chỉnh cài đặt trên TiaRun giao diện sáng" loading="lazy">
-          </div>
-          <figcaption>
-            Nhấn <kbd>Ctrl</kbd> + <kbd>,</kbd> để đổi theme kính mờ, độ trong suốt và thư mục quét file.
-          </figcaption>
-        </figure>
-      </fieldset>
+        <figcaption>Chọn ứng dụng rồi nhấn <kbd>Enter</kbd> để mở.</figcaption>
+      </figure>
     </section>
 
-    <!-- Usage & Shortcuts Section (Cheatsheet) -->
-    <section class="section usage-section" id="usage" aria-labelledby="usage-heading">
-      <div class="container section-grid">
-        <div class="usage-intro">
-          <h2 id="usage-heading">Cú pháp tra cứu</h2>
-          <p class="usage-summary">
-            Mọi thao tác bắt đầu từ thanh lệnh. Dùng <kbd>↑</kbd> <kbd>↓</kbd> để chọn kết quả, <kbd>Enter</kbd> để mở và <kbd>Esc</kbd> để đóng.
-          </p>
-          <div class="usage-navigation-hint">
-            <div class="hint-title">Phím điều hướng</div>
-            <p>
-              Nhấn <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> để đổi phạm vi tìm kiếm. Nhấn <kbd>→</kbd> để mở sâu vào thư mục con.
-            </p>
-          </div>
-        </div>
-
-        <div class="commands-wrapper">
-          <div class="commands-header-note">
-            <span>Bấm vào từng dòng để xem ảnh minh họa ở khung phía trên:</span>
-          </div>
-
-          <div class="cheatsheet-table" role="region" aria-label="Bảng cú pháp lệnh TiaRun">
-            <div class="cheatsheet-row header-row">
-              <span class="col-cmd">Cú pháp</span>
-              <span class="col-desc">Mô tả</span>
-              <span class="col-note">Chi tiết</span>
-            </div>
-
-            <div class="command-row" data-target-tab="apps" role="button" tabindex="0" title="Bấm để xem minh họa Ứng dụng">
-              <div class="col-cmd"><code>firefox</code></div>
-              <div class="col-desc">Mở ứng dụng</div>
-              <div class="col-note"><span class="note-text">Tự khớp không dấu: gõ <code>cai dat</code> ra Cài đặt.</span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="files" role="button" tabindex="0" title="Bấm để xem minh họa File">
-              <div class="col-cmd"><code>@f tai lieu</code></div>
-              <div class="col-desc">Tìm file và thư mục</div>
-              <div class="col-note"><span class="note-text">Hiện bảng xem trước bên phải. Nhấn <kbd>→</kbd> để mở thư mục con.</span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="text" role="button" tabindex="0" title="Bấm để xem minh họa Nội dung">
-              <div class="col-cmd"><code>@t ke hoach</code></div>
-              <div class="col-desc">Quét nội dung file</div>
-              <div class="col-note"><span class="note-text">Quét file text, mã nguồn và tài liệu <span class="text-nowrap">Word (<code>.docx</code>).</span></span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="calc" role="button" tabindex="0" title="Bấm để xem minh họa Máy tính">
-              <div class="col-cmd"><code>500 * 12</code></div>
-              <div class="col-desc">Tính toán và đổi đơn vị</div>
-              <div class="col-note"><span class="note-text">Hỗ trợ số học, đổi đơn vị <span class="text-nowrap">(<code>25 km to miles</code>)</span> và tiền tệ. <span class="text-nowrap"><kbd>Enter</kbd> để sao chép.</span></span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="windows" role="button" tabindex="0" title="Bấm để xem minh họa Cửa sổ">
-              <div class="col-cmd"><code>@w</code></div>
-              <div class="col-desc">Chuyển cửa sổ đang mở</div>
-              <div class="col-note"><span class="note-text">Chuyển focus sang cửa sổ đã chọn. Hỗ trợ X11 và Wayland trên Linux.</span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="clipboard" role="button" tabindex="0" title="Bấm để xem minh họa Clipboard">
-              <div class="col-cmd"><code>@c</code></div>
-              <div class="col-desc">Lịch sử clipboard</div>
-              <div class="col-note"><span class="note-text">Lưu trữ cục bộ trên máy. Nhấn <kbd>Enter</kbd> để sao chép lại.</span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="system" role="button" tabindex="0" title="Bấm để xem minh họa Hệ thống">
-              <div class="col-cmd"><code>@sys</code></div>
-              <div class="col-desc">Lệnh hệ thống</div>
-              <div class="col-note"><span class="note-text">Khóa màn hình, sleep, khởi động lại và tắt máy.</span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-
-            <div class="command-row" data-target-tab="settings" role="button" tabindex="0" title="Bấm để xem minh họa Cài đặt">
-              <div class="col-cmd"><kbd>Ctrl</kbd><span class="key-sep">+</span><kbd>,</kbd></div>
-              <div class="col-desc">Cài đặt launcher</div>
-              <div class="col-note"><span class="note-text">Đổi theme kính mờ / classic, độ trong suốt, font và thư mục index file.</span> <span class="inspect-tag" aria-hidden="true">Xem demo ↗</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Technical Architecture Section (Fact-based Engineering Notes) -->
-    <section class="section tech-section" id="architecture" aria-labelledby="tech-heading">
+    <section class="gallery-section section" id="gallery" aria-labelledby="gallery-heading">
       <div class="container">
-        <div class="tech-header">
-          <h2 id="tech-heading">Kỹ thuật & Vận hành</h2>
-          <p class="tech-lede">Cơ chế hoạt động và kiến trúc bên dưới của TiaRun.</p>
+        <div class="section-heading">
+          <h2 id="gallery-heading">Tính năng</h2>
         </div>
 
-        <div class="tech-grid">
-          <article class="tech-card">
-            <div class="tech-card-header">
-              <span class="tech-tag">Quyền riêng tư</span>
-              <h3>Xử lý hoàn toàn cục bộ</h3>
-            </div>
-            <p>Toàn bộ quá trình quét ứng dụng, lập chỉ mục file và lưu lịch sử clipboard đều chạy trên máy của bạn. Không gửi telemetry, không kết nối máy chủ phân tích và không đồng bộ dữ liệu ra ngoài.</p>
-          </article>
+        <div class="gallery">
+          <div class="gallery-tabs" role="tablist" aria-label="Ảnh chụp các tính năng" aria-orientation="vertical" hidden>
+            <button type="button" id="tab-apps" role="tab" aria-selected="true" aria-controls="panel-apps"><span>Mở ứng dụng</span></button>
+            <button type="button" id="tab-files" role="tab" aria-selected="false" aria-controls="panel-files" tabindex="-1"><span>Tìm tệp</span></button>
+            <button type="button" id="tab-text" role="tab" aria-selected="false" aria-controls="panel-text" tabindex="-1"><span>Tìm nội dung</span></button>
+            <button type="button" id="tab-calc" role="tab" aria-selected="false" aria-controls="panel-calc" tabindex="-1"><span>Tính và quy đổi</span></button>
+            <button type="button" id="tab-windows" role="tab" aria-selected="false" aria-controls="panel-windows" tabindex="-1"><span>Chuyển cửa sổ</span></button>
+            <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1"><span>Lịch sử clipboard</span></button>
+            <button type="button" id="tab-system" role="tab" aria-selected="false" aria-controls="panel-system" tabindex="-1"><span>Lệnh hệ thống</span></button>
+            <button type="button" id="tab-settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1"><span>Cài đặt</span></button>
+          </div>
 
-          <article class="tech-card">
-            <div class="tech-card-header">
-              <span class="tech-tag">Hiệu năng</span>
-              <h3>Kiến trúc daemon đơn tiến trình</h3>
+          <div class="gallery-display">
+            <div class="gallery-toolbar">
+              <span>Giao diện TiaRun</span>
+              <div class="theme-options" role="group" aria-label="Giao diện ảnh chụp" hidden>
+                <button type="button" data-gallery-theme="dark" aria-pressed="true">Tối</button>
+                <button type="button" data-gallery-theme="light" aria-pressed="false">Sáng</button>
+              </div>
             </div>
-            <p>TiaRun tạo cửa sổ một lần và duy trì tiến trình nền qua Unix domain socket (Linux) hoặc loopback TCP (Windows). Lần gọi sau chỉ gửi tín hiệu toggle qua socket, không tốn thời gian khởi tạo lại GPU context.</p>
-          </article>
-
-          <article class="tech-card">
-            <div class="tech-card-header">
-              <span class="tech-tag">Công nghệ</span>
-              <h3>Rust và framework Slint</h3>
-            </div>
-            <p>Viết hoàn toàn bằng Rust và framework UI Slint với bộ dựng OpenGL / FemtoVG (tự động fallback phần mềm trên Windows khi thiếu driver), hỗ trợ hai phong cách hiển thị Liquid Glass và Classic.</p>
-          </article>
-
-          <article class="tech-card">
-            <div class="tech-card-header">
-              <span class="tech-tag">Cấu hình</span>
-              <h3>Cấu hình TOML trực quan</h3>
-            </div>
-            <p>Mọi cài đặt gồm đường dẫn index, độ sâu thư mục (<code>depth</code>) và danh sách loại trừ lưu tại <code>~/.config/tiarun/config.toml</code> (Linux) hoặc <code>%APPDATA%\tiarun\config.toml</code> (Windows).</p>
-          </article>
+            <figure class="gallery-panel" id="panel-apps">
+              <img src="assets/demo-apps-dark.webp" width="880" height="540" alt="Tìm Firefox trong TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>firefox</code><p>Gõ tên ứng dụng rồi nhấn <kbd>Enter</kbd> để mở.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-files" hidden>
+              <img src="assets/demo-files-dark.webp" width="880" height="540" alt="Tìm Cargo.toml và xem trước nội dung tệp" loading="lazy" decoding="async">
+              <figcaption><code>@f Cargo.toml</code><p>Gõ tên tệp để tìm và xem trước. Với tên tiếng Việt, gõ <code>@f ke hoach</code> để tìm “Kế hoạch”. Nhấn <kbd>→</kbd> để vào thư mục con.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-text" hidden>
+              <img src="assets/demo-text-dark.webp" width="880" height="540" alt="Kết quả tìm nội dung kèm đoạn văn bản khớp" loading="lazy" decoding="async">
+              <figcaption><code>@t</code><p>Tìm từ khóa trong tệp văn bản, mã nguồn và tài liệu Word <code>.docx</code> ở các thư mục đã cấu hình.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-calc" hidden>
+              <img src="assets/demo-calc-dark.webp" width="880" height="540" alt="Kết quả quy đổi 25 kilômét sang dặm" loading="lazy" decoding="async">
+              <figcaption><code>25 km to miles</code><p>Gõ phép tính hoặc đổi đơn vị ngay trong thanh lệnh. Nhấn <kbd>Enter</kbd> để sao chép kết quả.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-windows" hidden>
+              <img src="assets/demo-windows-dark.webp" width="880" height="540" alt="Danh sách cửa sổ đang mở trong TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>@w</code><p>Tìm và chuyển đến cửa sổ đang mở. Trên Linux, tính năng phụ thuộc môi trường desktop.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-clipboard" hidden>
+              <img src="assets/demo-clipboard-dark.webp" width="880" height="540" alt="Danh sách các đoạn văn bản đã sao chép" loading="lazy" decoding="async">
+              <figcaption><code>@c</code><p>Tìm lại đoạn văn bản đã sao chép trước đó rồi nhấn <kbd>Enter</kbd> để sao chép lại.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-system" hidden>
+              <img src="assets/demo-system-dark.webp" width="880" height="540" alt="Danh sách thao tác hệ thống trong TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>@sys</code><p>Tìm thao tác như khóa màn hình, tạm nghỉ hoặc khởi động lại. Các thao tác có thể khác nhau theo hệ điều hành.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-settings" hidden>
+              <img src="assets/demo-settings-dark.webp" width="880" height="540" alt="Phần cài đặt giao diện của TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>Ctrl + ,</code><p>Đổi giao diện, độ trong suốt và các thư mục tìm kiếm trong phần cài đặt.</p></figcaption>
+            </figure>
+            <noscript>
+              <nav class="gallery-image-links" aria-label="Các ảnh chụp khác">
+                <a class="text-link" href="assets/demo-files-dark.webp">Tìm tệp</a>
+                <a class="text-link" href="assets/demo-text-dark.webp">Tìm nội dung</a>
+                <a class="text-link" href="assets/demo-calc-dark.webp">Tính và quy đổi</a>
+                <a class="text-link" href="assets/demo-windows-dark.webp">Chuyển cửa sổ</a>
+                <a class="text-link" href="assets/demo-clipboard-dark.webp">Lịch sử clipboard</a>
+                <a class="text-link" href="assets/demo-system-dark.webp">Lệnh hệ thống</a>
+                <a class="text-link" href="assets/demo-settings-dark.webp">Cài đặt</a>
+              </nav>
+            </noscript>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Download Section -->
+    <section class="section usage-section" id="usage" aria-labelledby="usage-heading">
+      <div class="container usage-grid">
+        <div class="section-heading">
+          <h2 id="usage-heading">Bắt đầu sử dụng</h2>
+          <p>Mở TiaRun sau khi cài đặt, rồi dùng phím tắt để hiện hoặc ẩn thanh lệnh.</p>
+          <p class="usage-keys key-group"><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd></p>
+          <p>Dùng <kbd>↑</kbd> <kbd>↓</kbd> để chọn, <kbd>Enter</kbd> để thực hiện và <kbd>Esc</kbd> để đóng.</p>
+          <p>Dùng <kbd>Tab</kbd> hoặc <kbd>Shift</kbd> + <kbd>Tab</kbd> để chuyển phạm vi tìm kiếm.</p>
+        </div>
+
+        <dl class="commands" aria-label="Các lệnh để bắt đầu">
+          <div><dt><code>firefox</code></dt><dd>Mở một ứng dụng đã cài</dd></div>
+          <div><dt><code>@f ke hoach</code></dt><dd>Tìm tệp có tên “Kế hoạch”</dd></div>
+          <div><dt><code>@t hợp đồng</code></dt><dd>Tìm cụm từ bên trong tệp</dd></div>
+          <div><dt><code>500 * 12</code></dt><dd>Tính và sao chép kết quả</dd></div>
+          <div><dt><code>@w</code> <code>@c</code> <code>@sys</code></dt><dd>Cửa sổ, clipboard và lệnh hệ thống</dd></div>
+        </dl>
+      </div>
+    </section>
+
     <section class="section download-section" id="download" aria-labelledby="download-heading">
       <div class="container">
-        <div class="download-heading">
-          <div class="download-title-group">
-            <h2 id="download-heading">Tải về</h2>
-            <span class="release-tag-badge" id="release-version-badge">v1.0.1</span>
-          </div>
-          <a class="text-link" href="https://github.com/hieunx1024/tiarun/releases" target="_blank" rel="noopener noreferrer">
-            <span>Toàn bộ phiên bản trên GitHub</span>
-            <svg class="external-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </a>
+        <div class="section-heading">
+          <h2 id="download-heading">Tải TiaRun</h2>
+          <p>Chọn bộ cài hoặc bản giải nén cho máy tính x86-64.</p>
         </div>
 
         <div class="downloads-grid">
-          <!-- Windows Card -->
-          <article class="download-card" id="card-windows">
-            <div class="card-header">
-              <div class="os-icon os-windows" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                  <path d="M3 5.479L10.5 4.457V11.25H3V5.479ZM3 12.75H10.5V19.543L3 18.521V12.75ZM11.75 4.293L21 3V11.25H11.75V4.293ZM21 12.75L11.75 12.75V19.707L21 18.414V12.75Z"/>
-                </svg>
-              </div>
-              <div class="os-info">
-                <h3>Windows</h3>
-                <span class="os-arch">x86-64</span>
-              </div>
-              <span class="os-badge" id="badge-windows" hidden>
-                <span class="badge-dot" aria-hidden="true"></span>Bản cho máy bạn
+          <article class="download-card" id="card-windows" aria-labelledby="windows-heading">
+            <div class="card-heading">
+              <span class="platform-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h8v7H3zm10 0h8v7h-8zM3 13h8v7H3zm10 0h8v7h-8z"/></svg>
               </span>
+              <h3 id="windows-heading">Windows</h3>
             </div>
-
-            <p class="card-desc">Bộ cài đặt tự động tạo lối tắt Start Menu, hoặc bản portable chạy ngay không cần cài đặt.</p>
-
-            <div class="card-actions">
-              <a class="button secondary download-btn" data-package="exe" href="https://github.com/hieunx1024/tiarun/releases/latest">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span class="btn-label">Tải bộ cài (.exe)</span>
-                <span class="file-size" id="size-exe">· 5.4 MB</span>
-              </a>
-
-              <a class="text-link secondary-download" data-package="zip" href="https://github.com/hieunx1024/tiarun/releases/latest">
-                <span>Bản portable (.zip)</span>
-                <span class="file-size-inline" id="size-zip">(5.1 MB)</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              </a>
+            <div class="package-list">
+              <div class="package">
+                <div>
+                  <h4>Bộ cài Windows</h4>
+                  <p>Chạy bộ cài rồi mở TiaRun từ menu Start.</p>
+                </div>
+                <a class="button secondary" data-package="exe" data-download-label="Tải bộ cài (.exe)" href="https://github.com/hieunx1024/tiarun/releases/latest"><span>Xem .exe trên GitHub</span><small hidden></small></a>
+              </div>
+              <div class="package">
+                <div>
+                  <h4>Bản portable</h4>
+                  <p>Giải nén rồi chạy <code>tiarun.exe</code>.</p>
+                </div>
+                <a class="text-link" data-package="zip" data-download-label="Tải bản portable (.zip)" href="https://github.com/hieunx1024/tiarun/releases/latest"><span>Xem .zip trên GitHub</span><small hidden></small></a>
+              </div>
             </div>
           </article>
 
-          <!-- Linux Card -->
-          <article class="download-card" id="card-linux">
-            <div class="card-header">
-              <div class="os-icon os-linux" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="2" y="4" width="20" height="16" rx="3" />
-                  <path d="m7 9 3 3-3 3" />
-                  <path d="M13 15h4" />
-                </svg>
-              </div>
-              <div class="os-info">
-                <h3>Linux</h3>
-                <span class="os-arch">x86-64</span>
-              </div>
-              <span class="os-badge" id="badge-linux" hidden>
-                <span class="badge-dot" aria-hidden="true"></span>Bản cho máy bạn
+          <article class="download-card" id="card-linux" aria-labelledby="linux-heading">
+            <div class="card-heading">
+              <span class="platform-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m7 9 3 3-3 3m7 0h3"/></svg>
               </span>
+              <h3 id="linux-heading">Linux</h3>
             </div>
-
-            <p class="card-desc">Gói .deb tự tạo lối tắt ứng dụng cho Debian / Ubuntu, hoặc bản nén chạy độc lập.</p>
-
-            <div class="card-actions">
-              <a class="button secondary download-btn" data-package="deb" href="https://github.com/hieunx1024/tiarun/releases/latest">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span class="btn-label">Tải gói Debian / Ubuntu (.deb)</span>
-                <span class="file-size" id="size-deb">· 5.2 MB</span>
-              </a>
-
-              <a class="text-link secondary-download" data-package="tar" href="https://github.com/hieunx1024/tiarun/releases/latest">
-                <span>Bản nén độc lập (.tar.gz)</span>
-                <span class="file-size-inline" id="size-tar">(7.2 MB)</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              </a>
+            <div class="package-list">
+              <div class="package">
+                <div>
+                  <h4>Debian và Ubuntu</h4>
+                  <p>Mở tệp <code>.deb</code> bằng trình cài đặt phần mềm.</p>
+                </div>
+                <a class="button secondary" data-package="deb" data-download-label="Tải gói (.deb)" href="https://github.com/hieunx1024/tiarun/releases/latest"><span>Xem .deb trên GitHub</span><small hidden></small></a>
+              </div>
+              <div class="package">
+                <div>
+                  <h4>Bản nén cho Linux</h4>
+                  <p>Giải nén rồi chạy <code>tiarun</code> bên trong.</p>
+                </div>
+                <a class="text-link" data-package="tar" data-download-label="Tải bản nén (.tar.gz)" href="https://github.com/hieunx1024/tiarun/releases/latest"><span>Xem .tar.gz trên GitHub</span><small hidden></small></a>
+              </div>
             </div>
           </article>
         </div>
 
-        <!-- Build from Source Collapsible -->
-        <details class="build-guide">
-          <summary>Biên dịch từ mã nguồn</summary>
-          <div class="build-guide-content">
-            <p>Yêu cầu Rust toolchain phiên bản ổn định (stable) và Cargo. Cài đặt các thư viện đồ họa hệ thống trên Debian / Ubuntu:</p>
-            <pre><code>sudo apt install build-essential pkg-config libxkbcommon-dev libxkbcommon-x11-dev \
-  libfontconfig1-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libx11-dev libx11-xcb-dev</code></pre>
-            <p>Clone kho mã nguồn và biên dịch bản release tối ưu:</p>
-            <pre><code>git clone https://github.com/hieunx1024/tiarun.git
-cd tiarun
-cargo build --release --locked</code></pre>
-            <p>File thực thi sau khi biên dịch nằm tại <code>target/release/tiarun</code> (Linux) hoặc <code>target\release\tiarun.exe</code> (Windows).</p>
-            <a class="text-link" href="https://github.com/hieunx1024/tiarun#build-from-source" target="_blank" rel="noopener noreferrer">
-              <span>Xem tài liệu chi tiết trên GitHub</span>
-              <svg class="external-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </a>
-          </div>
-        </details>
+        <div class="release-links">
+          <a class="text-link" id="release-link" href="https://github.com/hieunx1024/tiarun/releases/latest">Bản phát hành mới nhất <span id="release-version" hidden></span></a>
+          <a class="text-link" href="https://github.com/hieunx1024/tiarun/releases">Lịch sử phiên bản</a>
+          <a class="text-link" href="https://github.com/hieunx1024/tiarun#build-from-source">Biên dịch từ mã nguồn</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section faq-section" id="architecture" aria-labelledby="faq-heading">
+      <div class="container faq-grid">
+        <div class="section-heading">
+          <h2 id="faq-heading">Câu hỏi thường gặp</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>TiaRun tìm kiếm dữ liệu ở đâu?</summary>
+            <p>TiaRun tìm ứng dụng và tệp trên máy. Khi bạn chọn kết quả tìm trên web, truy vấn sẽ mở trong trình duyệt. Tính năng đổi tiền tệ có thể kết nối mạng để cập nhật tỷ giá.</p>
+          </details>
+          <details>
+            <summary>Phím tắt trên Linux chưa hoạt động thì sao?</summary>
+            <p>Mở cài đặt phím tắt của môi trường desktop và gán <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> cho lệnh <code>tiarun</code>. Nếu dùng bản giải nén, nhập đường dẫn đầy đủ đến tệp thực thi.</p>
+          </details>
+          <details>
+            <summary>TiaRun mở lại cửa sổ bằng cách nào?</summary>
+            <p>TiaRun tạo cửa sổ một lần rồi giữ tiến trình chạy nền. Lần gọi tiếp theo gửi tín hiệu đến tiến trình đó để hiện hoặc ẩn cửa sổ.</p>
+          </details>
+          <details>
+            <summary>Tôi có thể tự chọn thư mục tìm kiếm không?</summary>
+            <p>Dùng <kbd>Ctrl</kbd> + <kbd>,</kbd> để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu và danh sách loại trừ trong <a href="https://github.com/hieunx1024/tiarun#configuration">tệp cấu hình TOML</a>.</p>
+          </details>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <div class="footer-brand">
-        <img src="assets/logo.svg" alt="" width="22" height="22" class="brand-logo">
-        <span class="footer-name">TiaRun</span>
-        <span class="footer-desc">Launcher nguồn mở cho Windows và Linux.</span>
-      </div>
-
+      <a class="brand" href="#top" aria-label="Về đầu trang TiaRun">
+        <img src="assets/tiarun-64.png" width="28" height="28" alt="">
+        TiaRun
+      </a>
       <nav class="footer-nav" aria-label="Liên kết dự án">
-        <a href="https://github.com/hieunx1024/tiarun" target="_blank" rel="noopener noreferrer">Mã nguồn</a>
-        <a href="https://github.com/hieunx1024/tiarun/issues" target="_blank" rel="noopener noreferrer">Báo lỗi & góp ý</a>
-        <button type="button" class="footer-donate-btn" id="btn-open-donate">Ủng hộ</button>
+        <a href="https://github.com/hieunx1024/tiarun">Mã nguồn</a>
+        <a href="https://github.com/hieunx1024/tiarun/issues">Báo lỗi và góp ý</a>
+        <a id="donate-link" href="https://github.com/sponsors/hieunx1024">Ủng hộ</a>
       </nav>
     </div>
   </footer>
 
-  <!-- Donate Dialog Modal (Pure Semantic HTML5 Dialog) -->
-  <dialog class="donate-dialog" id="donate-dialog" aria-labelledby="donate-title">
-    <div class="donate-modal-inner">
-      <div class="donate-modal-header">
-        <h3 id="donate-title">Ủng hộ phát triển TiaRun</h3>
-        <button type="button" class="donate-close-btn" id="btn-close-donate" aria-label="Đóng hộp thoại ủng hộ" title="Đóng">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <p class="donate-lead">
-        TiaRun là phần mềm mã nguồn mở miễn phí. Nếu ứng dụng hữu ích cho công việc hằng ngày, bạn có thể ủng hộ để duy trì phát triển dự án.
-      </p>
-
-      <div class="donate-methods">
-        <!-- Chuyển khoản trong nước (VietQR) -->
-        <div class="donate-method-card">
-          <div class="donate-method-title">Chuyển khoản trong nước (VietQR)</div>
-          <div class="qr-container">
-            <!-- Tác giả có thể thay ảnh assets/vietqr.png bằng mã QR tài khoản ngân hàng thực tế -->
-            <img src="assets/vietqr.png" alt="Mã VietQR ủng hộ tác giả TiaRun" width="160" height="160" class="qr-image" onerror="this.style.display='none'; document.getElementById('qr-fallback').style.display='flex';">
-            <div id="qr-fallback" class="qr-fallback" style="display: none;">
-              <span>Quét mã VietQR</span>
-            </div>
-          </div>
-          <div class="bank-details">
-            <div class="bank-row"><span class="bank-k">Ngân hàng</span><span class="bank-v">MBBank (Quân Đội)</span></div>
-            <div class="bank-row"><span class="bank-k">Số tài khoản</span><code class="bank-v bank-code">TIARUN</code></div>
-            <div class="bank-row"><span class="bank-k">Chủ tài khoản</span><span class="bank-v">NGUYEN XUAN HIEU</span></div>
-          </div>
-        </div>
-
-        <!-- Quốc tế (GitHub Sponsors & Ko-fi) -->
-        <div class="donate-method-card">
-          <div class="donate-method-title">Quốc tế (International)</div>
-          <p class="donate-intl-desc">Ủng hộ qua các nền tảng tài trợ dành cho nhà phát triển mã nguồn mở:</p>
-          <div class="donate-intl-buttons">
-            <!-- Thay đổi đường dẫn GitHub Sponsors / Ko-fi của bạn tại đây -->
-            <a class="button secondary donate-intl-btn" href="https://github.com/sponsors/hieunx1024" target="_blank" rel="noopener noreferrer">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-              </svg>
-              <span>GitHub Sponsors</span>
-              <svg class="external-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </a>
-
-            <a class="button secondary donate-intl-btn" href="https://ko-fi.com/hieunx" target="_blank" rel="noopener noreferrer">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-                <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                <line x1="6" y1="1" x2="6" y2="4"></line>
-                <line x1="10" y1="1" x2="10" y2="4"></line>
-                <line x1="14" y1="1" x2="14" y2="4"></line>
-              </svg>
-              <span>Ko-fi</span>
-              <svg class="external-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </a>
-          </div>
-        </div>
-      </div>
+  <dialog id="donate-dialog" aria-labelledby="donate-title">
+    <div class="donate-header">
+      <h2 id="donate-title">Ủng hộ TiaRun</h2>
+      <form method="dialog"><button class="icon-button" aria-label="Đóng" autofocus>×</button></form>
+    </div>
+    <p>Bạn có thể góp phần duy trì dự án qua VietQR, GitHub Sponsors hoặc Ko-fi.</p>
+    <div class="donate-bank">
+      <img src="assets/vietqr.png" alt="Mã VietQR ủng hộ tác giả TiaRun" width="132" height="132" loading="lazy">
+      <dl>
+        <dt>Ngân hàng</dt><dd>MBBank (Quân Đội)</dd>
+        <dt>Số tài khoản</dt><dd><code>TIARUN</code></dd>
+        <dt>Chủ tài khoản</dt><dd>NGUYEN XUAN HIEU</dd>
+      </dl>
+    </div>
+    <div class="hero-actions">
+      <a class="button secondary" href="https://github.com/sponsors/hieunx1024">GitHub Sponsors</a>
+      <a class="button secondary" href="https://ko-fi.com/hieunx">Ko-fi</a>
     </div>
   </dialog>
 </body>
