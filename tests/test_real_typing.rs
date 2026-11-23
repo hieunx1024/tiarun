@@ -37,7 +37,7 @@ fn test_real_typing_simulation() {
         icon: None,
         category: Some("Browser".to_string()),
     });
-    let engine = Arc::new(LauncherEngine::new(config));
+    let engine = Arc::new(LauncherEngine::with_temporary_index(config));
     let icon_resolver = Arc::new(IconResolver::new());
     let current_results = Arc::new(std::sync::RwLock::new(Vec::new()));
 

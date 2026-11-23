@@ -187,6 +187,22 @@ impl FilePreview {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
         let formatted_len = format_file_size(file_len);
 
+        // Cloud-only placeholders (OneDrive "Files On-Demand"...): reading them for a
+        // preview would download the file, and the first result is previewed on
+        // every keystroke. Show metadata only.
+        if crate::search_index::extractors::DocumentExtractor::is_cloud_placeholder(path) {
+            return Self {
+                title,
+                preview_type: "metadata".to_string(),
+                preview_lang: if ext.is_empty() { "FILE".to_string() } else { ext.to_uppercase() },
+                text_snippet: String::new(),
+                file_size: format!("{formatted_len} (Online only)"),
+                modified_time,
+                location,
+                image_path: None,
+            };
+        }
+
         // 2. Image files (or files with pre-rendered OS thumbnails like PDF / Video)
         let is_image_ext = matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "svg" | "webp" | "bmp" | "ico");
         let has_os_thumb = get_freedesktop_thumbnail(path).is_some();

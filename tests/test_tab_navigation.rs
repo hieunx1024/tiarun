@@ -17,7 +17,7 @@ fn test_tab_directory_and_scope_navigation() {
     };
 
     let config = Config::default();
-    let _engine = Arc::new(LauncherEngine::new(config));
+    let _engine = Arc::new(LauncherEngine::with_temporary_index(config));
     let icon_resolver = Arc::new(IconResolver::new());
     let current_results: Arc<std::sync::RwLock<Vec<LauncherItem>>> = Arc::new(std::sync::RwLock::new(Vec::new()));
 

@@ -81,7 +81,7 @@ fn test_category_chips_loaded_on_startup_and_filter_results() {
     use tiarun::launcher::LauncherEngine;
     use tiarun::apps::AppCategoryFilter;
 
-    let engine = LauncherEngine::new(Config::default());
+    let engine = LauncherEngine::with_temporary_index(Config::default());
     let available = engine.available_categories();
     assert!(available.contains(&"Applications".to_string()));
     assert!(available.contains(&"Actions".to_string()));

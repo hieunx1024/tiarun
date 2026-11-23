@@ -190,6 +190,11 @@ impl ContentSearchEngine {
             return if out.is_empty() { None } else { Some(out.join("\n")) };
         }
 
+        // Binary/parsed formats have no readable lines; let the regular preview show them.
+        if !crate::search_index::extractors::DocumentExtractor::is_plain_text_document(path) {
+            return None;
+        }
+
         let file = File::open(path).ok()?;
         let reader = BufReader::new(file);
         let start = target_line.saturating_sub(5).max(1);
@@ -260,7 +265,16 @@ impl ContentSearchEngine {
                 if candidate_files.len() >= 10000 {
                     break 'roots;
                 }
-                if entry.file_type().is_file() && scope.allows_extension(entry.path()) {
+                // Same policy as the index: only documents. Formats that need a full
+                // parse (PDF, Office except .docx, OpenDocument, RTF) are left to the
+                // background indexer.
+                let path = entry.path();
+                if entry.file_type().is_file()
+                    && scope.allows_extension(path)
+                    && (crate::search_index::extractors::DocumentExtractor::is_plain_text_document(path)
+                        || path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("docx")))
+                    && !crate::search_index::extractors::DocumentExtractor::is_cloud_placeholder(path)
+                {
                     candidate_files.push(entry.into_path());
                 }
             }
@@ -288,7 +302,13 @@ impl ContentSearchEngine {
 
     /// Converts a `ContentMatch` into a `LauncherItem` displayable in the UI.
     pub fn match_to_launcher_item(m: &ContentMatch) -> LauncherItem {
-        let desc = format!("Line {}: \"{}\"", m.line_number, m.snippet);
+        // Parsed formats (PDF, Office, OpenDocument, RTF) have no real line numbers.
+        let has_lines = crate::search_index::extractors::DocumentExtractor::is_plain_text_document(Path::new(&m.file_path));
+        let desc = if has_lines {
+            format!("Line {}: \"{}\"", m.line_number, m.snippet)
+        } else {
+            format!("Match: \"{}\"", m.snippet)
+        };
         LauncherItem::new(
             m.file_name.clone(),
             m.file_path.clone(),

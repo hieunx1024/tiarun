@@ -56,7 +56,7 @@ fn test_viewlauncher_comprehensive_stress_bench() {
     println!("\n[1/6] Benchmarking Cold Engine Startup on Live System...");
     let start_startup = Instant::now();
     let config = Config::default();
-    let mut engine = LauncherEngine::new(config);
+    let mut engine = LauncherEngine::with_temporary_index(config);
     let startup_dur = start_startup.elapsed();
     println!("  -> Cold start completed in: {:.2} ms", startup_dur.as_secs_f64() * 1000.0);
     println!("  -> Real system apps indexed: {}", engine.apps.len());

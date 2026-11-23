@@ -5,8 +5,24 @@ use std::time::Duration;
 use walkdir::WalkDir;
 
 use super::db::SearchDb;
-use super::extractors::DocumentExtractor;
+use super::extractors::{DocumentExtractor, ExtractedDocument};
 use super::scope::SearchScope;
+
+/// Writes are flushed in one transaction per batch: FTS5 creates an index segment
+/// per transaction, so per-file commits fragment the index and slow down queries.
+const BATCH_FILES: usize = 64;
+const BATCH_BYTES: usize = 8 * 1024 * 1024;
+
+enum PendingWrite {
+    Upsert {
+        path: String,
+        filename: String,
+        extension: Option<String>,
+        size: u64,
+        mtime: i64,
+        doc: ExtractedDocument,
+    },
+}
 
 pub struct SearchCrawler;
 
@@ -29,11 +45,21 @@ impl SearchCrawler {
                 if stop_flag.load(Ordering::Relaxed) {
                     return;
                 }
-                let mut db = match SearchDb::open(&db_path) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        eprintln!("[tiarun-crawler] Failed to open search index database: {e}");
-                        return;
+                // Opening can fail while another connection holds the write lock
+                // (e.g. rebuilding an old index); keep retrying instead of leaving
+                // the index unmaintained for the whole session.
+                let mut db = loop {
+                    match SearchDb::open(&db_path) {
+                        Ok(db) => break db,
+                        Err(error) => {
+                            eprintln!("[tiarun-crawler] Failed to open search index database: {error}; retrying");
+                            for _ in 0..10 {
+                                if stop_flag.load(Ordering::Relaxed) {
+                                    return;
+                                }
+                                std::thread::sleep(Duration::from_secs(1));
+                            }
+                        }
                     }
                 };
 
@@ -42,12 +68,18 @@ impl SearchCrawler {
                         break;
                     }
 
-                    let pass = Self::run_indexing_cycle(&scope, &mut db, &stop_flag);
+                    let pass = db
+                        .strip_non_document_content()
+                        .and_then(|_| Self::run_indexing_cycle(&scope, &mut db, &stop_flag));
                     if stop_flag.load(Ordering::Relaxed) {
                         return;
                     }
-                    match pass.and_then(|()| db.cleanup_missing_files()) {
-                        Ok(_) => initial_pass_complete.store(true, Ordering::Release),
+                    let pass = pass
+                        .and_then(|()| db.cleanup_missing_files())
+                        .and_then(|_| db.cleanup_out_of_scope(&scope))
+                        .and_then(|_| db.set_state(super::COMPLETED_SCOPE_KEY, &scope.signature()));
+                    match pass {
+                        Ok(()) => initial_pass_complete.store(true, Ordering::Release),
                         Err(error) => eprintln!("[tiarun-crawler] Indexing pass failed: {error}"),
                     }
 
@@ -86,6 +118,29 @@ impl SearchCrawler {
         stop_flag: &AtomicBool,
     ) -> rusqlite::Result<()> {
         let mut processed_in_batch = 0usize;
+        let mut pending = Vec::new();
+        let mut pending_bytes = 0usize;
+        let flush = |db: &mut SearchDb, pending: &mut Vec<PendingWrite>| -> rusqlite::Result<()> {
+            if pending.is_empty() {
+                return Ok(());
+            }
+            db.in_transaction(|db| {
+                for write in pending.drain(..) {
+                    match write {
+                        PendingWrite::Upsert { path, filename, extension, size, mtime, doc } => db.upsert_file(
+                            &path,
+                            &filename,
+                            extension.as_deref(),
+                            size,
+                            mtime,
+                            &doc.content,
+                            &doc.content_norm,
+                        )?,
+                    }
+                }
+                Ok(())
+            })
+        };
 
         for (dir, max_depth) in scope.crawl_roots() {
             for entry in WalkDir::new(dir)
@@ -94,6 +149,11 @@ impl SearchCrawler {
                 .filter_entry(|entry| scope.allows_name(entry.path()))
                 .flatten()
             {
+                if super::is_indexing_paused() {
+                    // Do not hold the write lock while waiting.
+                    flush(db, &mut pending)?;
+                    pending_bytes = 0;
+                }
                 while super::is_indexing_paused() {
                     if stop_flag.load(Ordering::Relaxed) {
                         return Ok(());
@@ -126,22 +186,20 @@ impl SearchCrawler {
                     continue;
                 }
 
-                let filename = entry.file_name().to_string_lossy();
-                let extension = path.extension().and_then(|ext| ext.to_str());
-
-                // Extract text and normalized text
-                if let Some(doc) = DocumentExtractor::extract(path) {
-                    db.upsert_file(
-                        &path_str,
-                        &filename,
-                        extension,
-                        size,
-                        mtime,
-                        &doc.content,
-                        &doc.content_norm,
-                    )?;
-                } else if previous.is_some() {
-                    db.delete_file(&path_str)?;
+                // Every file is findable by name; only documents carry content.
+                let doc = DocumentExtractor::extract_for_index(path);
+                pending_bytes += doc.content.len() + doc.content_norm.len() + 256;
+                pending.push(PendingWrite::Upsert {
+                    path: path_str.into_owned(),
+                    filename: entry.file_name().to_string_lossy().into_owned(),
+                    extension: path.extension().and_then(|ext| ext.to_str()).map(str::to_owned),
+                    size,
+                    mtime,
+                    doc,
+                });
+                if pending.len() >= BATCH_FILES || pending_bytes >= BATCH_BYTES {
+                    flush(db, &mut pending)?;
+                    pending_bytes = 0;
                 }
 
                 processed_in_batch += 1;
@@ -151,6 +209,6 @@ impl SearchCrawler {
                 }
             }
         }
-        Ok(())
+        flush(db, &mut pending)
     }
 }

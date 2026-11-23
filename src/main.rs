@@ -1013,6 +1013,12 @@ fn file_size_label(path: &str) -> String {
         .unwrap_or_else(|_| "File".to_string())
 }
 
+/// Content-search rows carry their snippet in the description: `Line N: "..."` for
+/// plain text, `Match: "..."` for formats without line numbers.
+fn is_content_match(description: &str) -> bool {
+    description.starts_with("Line ") || description.starts_with("Match: ")
+}
+
 fn render_search_results(
     ui: &AppWindow,
     engine: &LauncherEngine,
@@ -1224,6 +1230,8 @@ fn render_search_results(
                 let icon = icon_resolver.resolve_file_type_icon(Path::new(&item.exec_or_path), launcher::ItemType::File);
                 let tag = if let Some(line) = item.description.as_deref().and_then(|desc| desc.strip_prefix("Line ")) {
                     line.split_once(':').map_or_else(|| "Content".to_string(), |(number, _)| format!("Line {number}"))
+                } else if item.description.as_deref().is_some_and(is_content_match) {
+                    "Content".to_string()
                 } else if let Some(file_sizes) = &file_sizes {
                     file_sizes.get(&item.exec_or_path).cloned().unwrap_or_else(|| "File".to_string())
                 } else {
@@ -1290,7 +1298,7 @@ fn render_search_results(
             }
             launcher::ItemType::File | launcher::ItemType::Dir => {
                 if let Some(ref desc) = item.description {
-                    if desc.starts_with("Line ") {
+                    if is_content_match(desc) {
                         desc.clone()
                     } else {
                         item.exec_or_path.clone()
@@ -2136,7 +2144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let file_sizes = matches.iter().take(max_rows)
                     .take_while(|_| !cancelled())
                     .filter(|(item, _)| item.item_type == launcher::ItemType::File
-                        && !item.description.as_deref().is_some_and(|desc| desc.starts_with("Line ")))
+                        && !item.description.as_deref().is_some_and(is_content_match))
                     .map(|(item, _)| (item.exec_or_path.clone(), file_size_label(&item.exec_or_path)))
                     .collect();
                 if cancelled() {

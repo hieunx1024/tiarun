@@ -153,12 +153,23 @@ pub struct LauncherEngine {
     pub search_index: Arc<crate::search_index::SearchIndexEngine>,
     matcher: SkimMatcherV2,
     pub config: Config,
-    pub file_watcher: Option<crate::file_watcher::FileWatcher>,
+    /// Filled in by a background thread once the shallow file list is loaded,
+    /// so registering the watches never delays startup.
+    pub file_watcher: Arc<std::sync::Mutex<Option<crate::file_watcher::FileWatcher>>>,
 }
 
 impl LauncherEngine {
     pub fn new(config: Config) -> Self {
         let search_index = Arc::new(crate::search_index::SearchIndexEngine::for_config(&config));
+        Self::with_search_index(config, search_index)
+    }
+
+    /// Engine backed by a throwaway index in the temp directory, so integration
+    /// tests never read or modify the user's real search index.
+    #[doc(hidden)]
+    pub fn with_temporary_index(config: Config) -> Self {
+        let path = crate::search_index::temporary_db_path();
+        let search_index = Arc::new(crate::search_index::SearchIndexEngine::with_db_path(&config, path));
         Self::with_search_index(config, search_index)
     }
 
@@ -169,7 +180,7 @@ impl LauncherEngine {
         let history = Arc::new(RwLock::new(HistoryManager::load()));
         let clipboard = Arc::new(crate::clipboard::ClipboardManager::new());
         let shallow_files = Arc::new(RwLock::new(Vec::new()));
-        let file_watcher = crate::file_watcher::FileWatcher::start(shallow_files.clone(), &config);
+        let file_watcher = Arc::new(std::sync::Mutex::new(None));
 
         let mut engine = Self {
             apps: Vec::new(),
@@ -203,12 +214,17 @@ impl LauncherEngine {
         
         let shallow_files_clone = engine.shallow_files.clone();
         let config_clone = config.clone();
+        let watcher_slot = engine.file_watcher.clone();
+        let watcher_index = engine.search_index.clone();
         std::thread::spawn(move || {
             let mut files = Vec::new();
             Self::index_files_impl(&config_clone, &mut files);
             if let Ok(mut lock) = shallow_files_clone.write() {
                 *lock = files;
             }
+            // Started after the list is in place so its updates are not overwritten.
+            let watcher = crate::file_watcher::FileWatcher::start(shallow_files_clone, &config_clone, Some(watcher_index));
+            *watcher_slot.lock().unwrap_or_else(|error| error.into_inner()) = watcher;
         });
         
         engine
