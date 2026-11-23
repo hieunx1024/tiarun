@@ -6,7 +6,7 @@
 
 TiaRun is a keyboard-driven desktop launcher for Windows and Linux. Open an app, find a file, switch windows, or copy the result of a calculation from the same search bar. Search also matches Vietnamese names without accents: `ke hoach` finds `Kế hoạch dự án`.
 
-[Download from GitHub Releases](https://github.com/hieunx1024/tiarun/releases/latest) · [Report a bug](https://github.com/hieunx1024/tiarun/issues)
+[Official Website](https://tiarun.vercel.app) · [Download from GitHub Releases](https://github.com/hieunx1024/tiarun/releases/latest) · [Report a bug](https://github.com/hieunx1024/tiarun/issues)
 
 ![TiaRun showing Firefox as the first search result](website/assets/demo-apps.webp)
 

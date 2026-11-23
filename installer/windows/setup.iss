@@ -2,7 +2,7 @@
 #define MyAppName "TiaRun"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Hieu Nguyen"
-#define MyAppURL "https://github.com/hieunx1024/tiarun"
+#define MyAppURL "https://tiarun.vercel.app"
 #define MyAppExeName "tiarun.exe"
 
 [Setup]
