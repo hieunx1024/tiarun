@@ -106,7 +106,9 @@ impl FileWatcher {
                 // its own watch. Adding it from this callback would deadlock the
                 // inotify event loop, hence the hand-off to another thread.
                 // A folder moved in from elsewhere arrives as a rename, not a create.
-                if PER_DIRECTORY_WATCHES && matches!(
+                // On every platform only the folder itself is reported, not the
+                // files already inside it, so it is rescanned (and on Linux watched).
+                if matches!(
                     event.kind,
                     EventKind::Create(_) | EventKind::Modify(notify::event::ModifyKind::Name(_))
                 ) {
@@ -173,8 +175,9 @@ impl FileWatcher {
             .collect()
     }
 
-    /// Watches directories created after startup (and anything already inside
-    /// them, e.g. an extracted archive or a moved-in folder).
+    /// Picks up directories that appear after startup: lists the files already
+    /// inside them (an extracted archive, a moved-in or renamed folder) and, on
+    /// Linux, adds their watches.
     #[allow(clippy::too_many_arguments)]
     fn spawn_new_dir_watcher(
         watcher: Weak<Mutex<RecommendedWatcher>>,
@@ -194,9 +197,11 @@ impl FileWatcher {
                         continue;
                     }
                     let Some(watcher) = watcher.upgrade() else { break };
-                    for sub in Self::watchable_dirs(&dir, &scope) {
-                        let _ = watcher.lock().unwrap_or_else(|error| error.into_inner())
-                            .watch(&sub, RecursiveMode::NonRecursive);
+                    if PER_DIRECTORY_WATCHES {
+                        for sub in Self::watchable_dirs(&dir, &scope) {
+                            let _ = watcher.lock().unwrap_or_else(|error| error.into_inner())
+                                .watch(&sub, RecursiveMode::NonRecursive);
+                        }
                     }
                     drop(watcher);
                     // Files that landed before the watch existed.
