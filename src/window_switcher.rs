@@ -1,21 +1,4 @@
 use std::process::Command;
-use crate::launcher::LauncherItem;
-
-#[cfg(target_os = "linux")]
-use std::collections::HashSet;
-#[cfg(target_os = "linux")]
-use std::fs;
-#[cfg(target_os = "linux")]
-use std::path::Path;
-
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
-
-#[cfg(unix)]
-unsafe extern "C" {
-    fn setsid() -> i32;
-}
-
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt as WindowsCommandExt;
 #[cfg(target_os = "windows")]
@@ -28,7 +11,7 @@ pub struct WindowItem {
     pub class_name: String,
 }
 
-pub fn get_open_windows(_known_apps: &[LauncherItem]) -> Vec<WindowItem> {
+pub fn get_open_windows() -> Vec<WindowItem> {
     let mut windows = Vec::new();
 
     // 1. Try Hyprland (Wayland)
@@ -98,47 +81,7 @@ pub fn get_open_windows(_known_apps: &[LauncherItem]) -> Vec<WindowItem> {
         }
     }
 
-    // 4. Linux / GNOME Wayland fallback: Scan running GUI processes & match against known apps
-    #[cfg(target_os = "linux")]
-    {
-        let running_bins = get_user_running_binaries();
-        let mut seen = HashSet::new();
-
-        for app in _known_apps {
-            let tokens = crate::launcher::parse_command_line(&app.exec_or_path);
-            let bin_target = tokens.iter()
-                .find(|t| *t != "env" && !t.contains('='))
-                .or_else(|| tokens.first());
-            let bin_name = bin_target
-                .and_then(|p| Path::new(p).file_name())
-                .map(|s| s.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-
-            if bin_name.is_empty() || bin_name == "tiarun" || bin_name == "view-launcher" {
-                continue;
-            }
-
-            // Exclude common background daemons
-            if is_background_daemon(&bin_name) || is_background_daemon(&app.name.to_lowercase()) {
-                continue;
-            }
-
-            let matches_binary = running_bins.contains(&bin_name)
-                || running_bins.iter().any(|r| (r.len() >= 4 && bin_name.contains(r)) || (bin_name.len() >= 4 && r.contains(&bin_name)));
-
-            if matches_binary {
-                if seen.insert(app.name.clone()) {
-                    windows.push(WindowItem {
-                        id: format!("app:{}", app.exec_or_path),
-                        title: app.name.clone(),
-                        class_name: "Running".to_string(),
-                    });
-                }
-            }
-        }
-    }
-
-    // 5. Windows 10/11 native active window switcher (<1ms via Win32 EnumWindows)
+    // 4. Windows 10/11 native active window switcher (<1ms via Win32 EnumWindows)
     #[cfg(target_os = "windows")]
     {
         use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM};
@@ -190,49 +133,6 @@ pub fn get_open_windows(_known_apps: &[LauncherItem]) -> Vec<WindowItem> {
     }
 
     windows
-}
-
-#[cfg(target_os = "linux")]
-fn is_background_daemon(name: &str) -> bool {
-    const DAEMONS: &[&str] = &[
-        "systemd", "dbus", "ibus", "tracker", "portal", "pipewire", "wireplumber",
-        "pulseaudio", "gnome-shell", "gnome-session", "gsd-", "evolution-alarm",
-        "gcr-ssh", "snap", "tiarun", "view-launcher", "python", "sh", "bash", "xdg-",
-        "at-spi", "dconf", "gvfs", "agent", "daemon", "service", "appindicators"
-    ];
-    DAEMONS.iter().any(|&d| name.contains(d))
-}
-
-#[cfg(target_os = "linux")]
-fn get_user_running_binaries() -> HashSet<String> {
-    let mut bins = HashSet::new();
-    let Ok(entries) = fs::read_dir("/proc") else { return bins; };
-
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        if name_str.chars().all(|c| c.is_ascii_digit()) {
-            let pid_path = entry.path();
-            if let Ok(comm) = fs::read_to_string(pid_path.join("comm")) {
-                let trimmed = comm.trim().to_lowercase();
-                if !trimmed.is_empty() {
-                    bins.insert(trimmed);
-                }
-            }
-            if let Ok(cmdline) = fs::read(pid_path.join("cmdline")) {
-                let text = String::from_utf8_lossy(&cmdline);
-                for token in text.split('\0') {
-                    if let Some(file) = Path::new(token).file_name() {
-                        let file_str = file.to_string_lossy().to_lowercase();
-                        if !file_str.is_empty() {
-                            bins.insert(file_str);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    bins
 }
 
 #[allow(dead_code)]
@@ -311,36 +211,6 @@ pub fn focus_window(id: &str) {
                 .creation_flags(CREATE_NO_WINDOW)
                 .spawn();
             return;
-        }
-
-        if let Some(exec) = id.strip_prefix("app:") {
-            let _ = Command::new("cmd")
-                .args(&["/C", "start", "", exec])
-                .creation_flags(CREATE_NO_WINDOW)
-                .spawn();
-            return;
-        }
-    }
-
-    #[cfg(unix)]
-    if let Some(exec) = id.strip_prefix("app:") {
-        let tokens = crate::launcher::parse_command_line(exec);
-        if !tokens.is_empty() {
-            let mut cmd = Command::new(&tokens[0]);
-            if tokens.len() > 1 {
-                cmd.args(&tokens[1..]);
-            }
-            unsafe {
-                cmd.stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .stdin(std::process::Stdio::null())
-                    .pre_exec(|| {
-                        setsid();
-                        Ok(())
-                    })
-                    .spawn()
-                    .ok();
-            }
         }
     }
 }

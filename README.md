@@ -30,7 +30,7 @@ Open TiaRun once, then use **Ctrl + Alt + Space** to show or hide it. If the sho
 | `firefox` | Find and launch an installed app. |
 | `@f ke hoach` | Find files and folders by name across indexed locations. |
 | `25 km to miles` | Convert units. Enter expressions like `500 * 12` to calculate. Press **Enter** to copy the result. |
-| `@w` | Search open windows and switch to the selected one. Results on Linux depend on the desktop session. |
+| `@w` | Search open windows and switch to the selected one. On Linux, requires Hyprland, Sway, or windows accessible through `wmctrl`. |
 | `@c` | Find previously copied text and copy it again. |
 | `@sys` | Find system actions such as lock, sleep, and restart. Availability depends on the platform. |
 

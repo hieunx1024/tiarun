@@ -871,9 +871,9 @@ impl LauncherEngine {
                 ""
             };
             let win_query_normalized = remove_vietnamese_accents(win_query);
-            let windows = crate::window_switcher::get_open_windows(&self.apps);
+            let windows = crate::window_switcher::get_open_windows();
             let items: Vec<LauncherItem> = windows.into_iter().map(|w| {
-                let icon = self.apps.iter().find(|a| a.name == w.title || a.exec_or_path == w.id.replace("app:", "")).and_then(|a| a.icon.clone());
+                let icon = self.apps.iter().find(|a| a.name == w.title).and_then(|a| a.icon.clone());
                 LauncherItem::new(
                     w.title,
                     w.id,
@@ -2607,6 +2607,28 @@ mod tests {
 
         let reboot_results = engine.search("restart");
         assert!(reboot_results.iter().any(|(item, _)| item.item_type == ItemType::System && item.name.contains("Restart")));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_window_mode_excludes_background_processes() {
+        let mut engine = LauncherEngine::new(Config::default());
+        let mut process = std::process::Command::new("sleep").arg("30").spawn().unwrap();
+        engine.apps = vec![LauncherItem::new(
+            "Window mode background fixture".to_string(),
+            "sleep".to_string(),
+            ItemType::App,
+            None,
+            false,
+            None,
+        )];
+
+        let results = engine.search("@w");
+        process.kill().unwrap();
+        process.wait().unwrap();
+
+        assert!(results.iter().all(|(item, _)| item.name != "Window mode background fixture"));
+        assert!(results.iter().all(|(item, _)| !item.exec_or_path.starts_with("app:")));
     }
 
     #[test]
