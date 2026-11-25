@@ -89,6 +89,14 @@
                 "@type": "Answer",
                 "text": "Press Ctrl + , to open Settings. You can also configure folders, search depth, web search engine, and exclusion rules in the TOML configuration file."
               }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I create a custom plugin for TiaRun?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Drop a script into ~/.config/tiarun/plugins/ (Linux) or %APPDATA%\\tiarun\\plugins\\ (Windows, supports .ps1, .bat, .cmd, .py, .exe), then invoke it with @script_name. TiaRun passes your query as the first argument and parses stdout lines formatted as Title (copies on Enter) or Title | Subtitle | Icon | Exec (runs a command or URL)."
+              }
             }
           ]
         }
@@ -294,7 +302,7 @@
           </article>
           <article class="usage-note">
             <h3>Custom folders &amp; Plugins</h3>
-            <p>Press <kbd>Ctrl</kbd> + <kbd>,</kbd> and click <strong>Edit config.toml</strong> to customize search folders, depth, or web search engine (<code>web_search_url</code>). Drop executable scripts into <code>~/.config/tiarun/plugins/</code> to invoke them with <code>@script_name</code>.</p>
+            <p>Press <kbd>Ctrl</kbd> + <kbd>,</kbd> and click <strong>Edit config.toml</strong> to customize search folders, depth, or web search engine (<code>web_search_url</code>). Drop scripts into <code>~/.config/tiarun/plugins/</code> (Linux) or <code>%APPDATA%\tiarun\plugins\</code> (Windows), output lines formatted as <code>Title | Subtitle | Icon | Exec</code> (or plain <code>Title</code> to copy), and invoke with <code>@script_name</code> — see <a class="text-link" href="https://github.com/hieunx1024/tiarun#plugins">templates on GitHub</a>.</p>
           </article>
         </div>
       </div>
@@ -395,6 +403,10 @@
           <details>
             <summary>Can I choose custom search folders?</summary>
             <p>Press <kbd>Ctrl</kbd> + <kbd>,</kbd> to open Settings. You can also configure folders, search depth, web search engine, and exclusion rules in the <a href="https://github.com/hieunx1024/tiarun#configuration">TOML configuration file</a>.</p>
+          </details>
+          <details>
+            <summary>How do I create a custom plugin for TiaRun?</summary>
+            <p>Place a script in <code>~/.config/tiarun/plugins/</code> (Linux, with <code>chmod +x</code>) or <code>%APPDATA%\tiarun\plugins\</code> (Windows, supports <code>.ps1</code>, <code>.bat</code>, <code>.cmd</code>, <code>.py</code>, <code>.exe</code>), then type <code>@script_name</code> in TiaRun. Each line printed to <code>stdout</code> creates a result: use <code>Title</code> to copy on Enter, or <code>Title | Subtitle | Icon | Exec</code> to run a command or open a URL. See the <a href="https://github.com/hieunx1024/tiarun#plugins">plugin guide &amp; templates</a>.</p>
           </details>
         </div>
       </div>

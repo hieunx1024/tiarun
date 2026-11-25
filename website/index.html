@@ -89,6 +89,14 @@
                 "@type": "Answer",
                 "text": "Dùng Ctrl + , để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu, công cụ tìm web và danh sách loại trừ trong tệp cấu hình TOML."
               }
+            },
+            {
+              "@type": "Question",
+              "name": "Cách viết plugin tùy biến cho TiaRun như thế nào?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Đặt script thực thi vào ~/.config/tiarun/plugins/ (Linux) hoặc %APPDATA%\\tiarun\\plugins\\ (Windows, hỗ trợ .ps1, .bat, .cmd, .py, .exe), rồi gõ @ten_file trong thanh tìm kiếm. Script nhận từ khóa làm đối số đầu tiên và xuất từng dòng theo dạng Title để copy hoặc Title | Subtitle | Icon | Exec để chạy lệnh."
+              }
             }
           ]
         }
@@ -294,7 +302,7 @@
           </article>
           <article class="usage-note">
             <h3>Tùy chỉnh nâng cao &amp; Plugin</h3>
-            <p>Nhấn <kbd>Ctrl</kbd> + <kbd>,</kbd> rồi chọn <strong>Edit config.toml</strong> để chỉnh thư mục index, độ sâu hoặc công cụ tìm web (<code>web_search_url</code>). Đặt script thực thi vào <code>~/.config/tiarun/plugins/</code> để gọi bằng <code>@tên_script</code>.</p>
+            <p>Nhấn <kbd>Ctrl</kbd> + <kbd>,</kbd> rồi chọn <strong>Edit config.toml</strong> để chỉnh thư mục index, độ sâu hoặc công cụ tìm web (<code>web_search_url</code>). Đặt script vào <code>~/.config/tiarun/plugins/</code> (Linux) hoặc <code>%APPDATA%\tiarun\plugins\</code> (Windows), xuất từng dòng dạng <code>Title | Subtitle | Icon | Exec</code> (hoặc 1 dòng để copy) và gọi bằng <code>@tên_script</code> — xem <a class="text-link" href="https://github.com/hieunx1024/tiarun#plugins">template mẫu trên GitHub</a>.</p>
           </article>
         </div>
       </div>
@@ -395,6 +403,10 @@
           <details>
             <summary>Tôi có thể tự chọn thư mục tìm kiếm không?</summary>
             <p>Dùng <kbd>Ctrl</kbd> + <kbd>,</kbd> để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu, công cụ tìm web và danh sách loại trừ trong <a href="https://github.com/hieunx1024/tiarun#configuration">tệp cấu hình TOML</a>.</p>
+          </details>
+          <details>
+            <summary>Cách viết plugin tùy biến cho TiaRun như thế nào?</summary>
+            <p>Đặt script vào <code>~/.config/tiarun/plugins/</code> (Linux, nhớ <code>chmod +x</code>) hoặc <code>%APPDATA%\tiarun\plugins\</code> (Windows, hỗ trợ <code>.ps1</code>, <code>.bat</code>, <code>.cmd</code>, <code>.py</code>, <code>.exe</code>), rồi gõ <code>@tên_file</code> trong TiaRun. Mỗi dòng in ra <code>stdout</code> theo chuẩn <code>Title</code> (bấm Enter để copy) hoặc <code>Title | Subtitle | Icon | Exec</code> (để chạy lệnh/mở URL). Xem <a href="https://github.com/hieunx1024/tiarun#plugins">hướng dẫn và template mẫu</a>.</p>
           </details>
         </div>
       </div>

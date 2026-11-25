@@ -64,6 +64,45 @@ depth = 3
 
 TiaRun searches apps and files on your device. Selecting a web search result opens the query in your browser. Currency conversion attempts to refresh exchange rates in the background when the cache is missing or older than 24 hours, and can use cached or built-in rates offline.
 
+## Plugins
+
+TiaRun supports Rofi-style custom script plugins. Place scripts inside the `plugins` directory and invoke them with `@<filename>` (without the file extension) or type `@` to browse all discovered plugins.
+
+| System | Plugins directory | Supported scripts |
+| --- | --- | --- |
+| Linux | `$XDG_CONFIG_HOME/tiarun/plugins/` (`~/.config/tiarun/plugins/`) | Any executable with a shebang (`chmod +x`) |
+| Windows | `%APPDATA%\tiarun\plugins\` | `.ps1`, `.bat`, `.cmd`, `.py`, or `.exe` (runs hidden without a console window) |
+
+When you type `@myplugin hello`, TiaRun passes `"hello"` as the first argument and parses each non-empty line from `stdout` (fields separated by `|`):
+
+| Output format | Action on **Enter** |
+| --- | --- |
+| `Title` | Copies `Title` to clipboard |
+| `Title \| Subtitle` | Copies `Title` to clipboard |
+| `Title \| Subtitle \| Icon` | Copies `Title` to clipboard (with icon) |
+| `Title \| Subtitle \| Icon \| Exec` | Runs the command or opens the URL in `Exec` |
+
+**Template (Linux — `~/.config/tiarun/plugins/links.sh`, run `chmod +x`):**
+
+```sh
+#!/usr/bin/env sh
+query="${1:-}"
+printf 'GitHub | Open GitHub repository | github | xdg-open https://github.com/hieunx1024/tiarun\n'
+printf 'TiaRun | Official website | web-browser | xdg-open https://tiarun.vercel.app\n'
+[ -n "$query" ] && printf 'Search GitHub: %s | Query repos | system-search | xdg-open "https://github.com/search?q=%s"\n' "$query" "$query"
+```
+
+**Template (Windows — `%APPDATA%\tiarun\plugins\links.ps1`):**
+
+```powershell
+param([string]$Query = "")
+Write-Output "GitHub | Open GitHub repository | explorer | https://github.com/hieunx1024/tiarun"
+Write-Output "TiaRun | Official website | msedge | https://tiarun.vercel.app"
+if ($Query) {
+    Write-Output "Search GitHub: $Query | Query repos | | https://github.com/search?q=$Query"
+}
+```
+
 ## Build from source
 
 Install the stable Rust toolchain. On Debian or Ubuntu, install the Linux build dependencies used by the release workflow.
