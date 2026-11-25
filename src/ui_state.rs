@@ -48,7 +48,7 @@ pub(crate) fn format_action_hints(
             launcher::ItemType::File => "↵ Open  •  Ctrl+C Copy  •  Alt+C Copy Path  •  Alt+T Terminal",
             launcher::ItemType::Dir => "↵ Open  •  → Browse  •  Ctrl+C Copy  •  Alt+C Copy Path",
             launcher::ItemType::Window => "↵ Focus Window  •  Alt+K Kill Process  •  Esc Close",
-            launcher::ItemType::Clipboard => "↵ Paste  •  Esc Close",
+            launcher::ItemType::Clipboard => "↵ Copy  •  Esc Close",
             launcher::ItemType::Calc => "↵ Copy to Clipboard",
             launcher::ItemType::Shell => "↵ Run in Terminal",
             launcher::ItemType::System => "↵ Execute Action",
@@ -1157,5 +1157,17 @@ mod tests {
         let (win_left, _) = format_action_hints(Some(&win), 1, 0);
         assert!(win_left.contains("Alt+K Kill Process"));
         assert!(!win_left.contains("Ctrl+K"));
+
+        let clip = LauncherItem::new(
+            "copied text".to_string(),
+            "copied text".to_string(),
+            ItemType::Clipboard,
+            None,
+            false,
+            None,
+        );
+        let (clip_left, _) = format_action_hints(Some(&clip), 1, 0);
+        assert!(clip_left.contains("↵ Copy"));
+        assert!(!clip_left.contains("Paste"));
     }
 }

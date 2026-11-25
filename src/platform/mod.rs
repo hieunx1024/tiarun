@@ -177,11 +177,18 @@ pub(crate) fn show_and_focus_launcher(
     let _ = show_launcher_window(ui);
     focus_launcher_window(ui);
     ui.invoke_focus_search();
+    if !query.is_empty() {
+        ui.invoke_move_cursor_to_end();
+    }
     if !was_visible {
+        let initial_query_owned = query.to_string();
         slint::Timer::single_shot(Duration::from_millis(30), move || {
             if let Some(ui) = ui_weak.upgrade().filter(|ui| ui.window().is_visible()) {
                 reposition_and_anchor_window(&ui);
                 ui.invoke_focus_search();
+                if !initial_query_owned.is_empty() && ui.get_search_text().as_str() == initial_query_owned {
+                    ui.invoke_move_cursor_to_end();
+                }
             }
         });
     }

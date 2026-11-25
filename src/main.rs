@@ -958,10 +958,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show_launcher_window(&ui)?;
         focus_launcher_window(&ui);
         ui.invoke_focus_search();
+        if initial_query.is_some() {
+            ui.invoke_move_cursor_to_end();
+        }
         let ui_w = ui.as_weak();
+        let initial_query_for_timer = initial_query.clone();
         slint::Timer::single_shot(Duration::from_millis(30), move || {
             if let Some(ui) = ui_w.upgrade() {
                 ui.invoke_focus_search();
+                if let Some(ref q) = initial_query_for_timer {
+                    if ui.get_search_text().as_str() == q {
+                        ui.invoke_move_cursor_to_end();
+                    }
+                }
             }
         });
     }
