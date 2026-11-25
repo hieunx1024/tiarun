@@ -13,7 +13,7 @@ fn test_settings_auto_save_triggers() {
     let saved = Arc::new(AtomicBool::new(false));
     let saved_clone = saved.clone();
 
-    ui.on_save_settings(move |_icons, _bar, _path, _res, _depth, _auto, _compact, _mode, _opacity, _style| {
+    ui.on_save_settings(move |_icons, _bar, _path, _res, _depth, _auto, _compact, _mode, _opacity| {
         saved_clone.store(true, Ordering::SeqCst);
     });
 

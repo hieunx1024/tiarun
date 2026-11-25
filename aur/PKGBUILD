@@ -1,4 +1,4 @@
-# Maintainer: Hieu Nguyen <hieunx@outlook.com>
+# Maintainer: Hieu Nguyen <work.hieunguyen@gmail.com>
 pkgname=tiarun-git
 _pkgname=tiarun
 pkgver=r4.7a1b2c3
@@ -7,8 +7,21 @@ pkgdesc="Think. Search. Run. - High-performance desktop launcher in Rust (<5ms)"
 arch=('x86_64')
 url="https://github.com/hieunx1024/tiarun"
 license=('MIT')
-depends=('gcc-libs')
-makedepends=('cargo' 'git')
+depends=(
+  'gcc-libs'
+  'libxkbcommon'
+  'libxkbcommon-x11'
+  'fontconfig'
+  'wayland'
+  'libglvnd'
+  'libx11'
+  'libxcb'
+)
+makedepends=('cargo' 'git' 'pkgconf')
+optdepends=(
+  'wl-clipboard: copy images and files to the Wayland clipboard'
+  'kdotool: window switcher support on KDE Plasma Wayland'
+)
 provides=('tiarun' 'view-launcher')
 conflicts=('tiarun' 'view-launcher')
 source=("git+https://github.com/hieunx1024/tiarun.git")
@@ -32,5 +45,8 @@ build() {
 package() {
   cd "$_pkgname"
   install -Dm755 "target/release/$_pkgname" "$pkgdir/usr/bin/$_pkgname"
+  install -Dm644 "assets/tiarun.desktop" "$pkgdir/usr/share/applications/tiarun.desktop"
+  install -Dm644 "assets/tiarun.png" "$pkgdir/usr/share/pixmaps/tiarun.png"
+  install -Dm644 "assets/tiarun.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/tiarun.svg"
   install -Dm644 "README.md" "$pkgdir/usr/share/doc/$_pkgname/README.md"
 }

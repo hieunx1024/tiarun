@@ -19,7 +19,8 @@ Get the package for your system from [GitHub Releases](https://github.com/hieunx
 | Windows | Installer (`.exe`) | Run the installer, then open TiaRun from the Start menu. |
 | Windows | Portable archive (`.zip`) | Extract the archive and run the executable inside. |
 | Debian or Ubuntu | Debian package (`.deb`) | Open the package with your software installer, or run `sudo apt install ./<package>.deb` with the downloaded filename. |
-| Linux | Archive (`.tar.gz`) | Extract the archive and run the included executable from your desktop session. |
+| Arch Linux | AUR (`tiarun-git`) | Install with an AUR helper (`yay -S tiarun-git`) or build from `aur/PKGBUILD`. |
+| Linux | Archive (`.tar.gz`) | Extract the archive and run `./install.sh` (installs binary, desktop entry, and runtime packages) or run `./tiarun` directly. |
 
 Open TiaRun once, then use **Ctrl + Alt + Space** to show or hide it. If the shortcut is unavailable on your Linux desktop, bind it to `tiarun` in your desktop's keyboard settings. For an extracted archive, use the full path to the executable.
 
@@ -28,21 +29,18 @@ Open TiaRun once, then use **Ctrl + Alt + Space** to show or hide it. If the sho
 | Type | What it does |
 | --- | --- |
 | `firefox` | Find and launch an installed app. |
-| `@f ke hoach` | Find files and folders by name across indexed locations. |
-| `25 km to miles` | Convert units. Enter expressions like `500 * 12` to calculate. Press **Enter** to copy the result. |
-| `@w` | Search open windows and switch to the selected one. On Linux, requires Hyprland, Sway, or windows accessible through `wmctrl`. |
+| `@f ke hoach` | Find files and folders by name across indexed locations and preview text, images, or folder metadata inline. |
+| `25 km to miles` | Convert units and currency rates. Enter expressions like `500 * 12` or `0xFF` to calculate. Press **Enter** to copy the result. |
+| `@w` | Search open windows with live CPU% & RAM stats, focus the selected window, or press **Alt + K** to kill its process. Supports Windows, Hyprland, Sway, X11/XWayland, KDE Wayland (`kdotool`), and GNOME Wayland (`Window Calls`). |
 | `@c` | Find previously copied text and copy it again. |
 | `@sys` | Find system actions such as lock, sleep, and restart. Availability depends on the platform. |
+| `@theme` / `@` | Switch theme or window opacity (`@theme 90`), or browse all modes and custom Rofi-style script plugins (`~/.config/tiarun/plugins/`). |
+| `! ls -la` | Run a shell command in your terminal (use **↑** / **↓** to recall past commands). |
+| `?` / **F1** | Open the built-in keyboard shortcuts cheatsheet. |
 
-Use **↑** and **↓** to select a result, **Enter** to activate it, and **Esc** to close the launcher. Open preferences with **Ctrl + ,** to adjust appearance, search settings, and startup behavior.
+Use **↑** and **↓** to select a result, **Enter** to activate it, and **Esc** to close the launcher. Press **Tab** / **Shift + Tab** to switch scopes (**Apps**, **Files**, **Windows**), **→** / **←** to browse folders, **Ctrl + C** to smart-copy, **Alt + C** to copy paths, **Alt + T** to open the selected folder in terminal, and **Ctrl + ,** to open preferences.
 
-### In development
-
-The source build adds `@t` for searching inside text files and Word `.docx` documents, and a preview pane for supported files. By default, content search looks in Documents, Desktop, and Downloads when those folders exist. Set `[[search.paths]]` to choose other locations.
-
-In this v1.0 release, **Tab** and **Shift + Tab** cycle between Apps, Files, Text, and Windows. Press **→** to browse into a selected folder.
-
-![TiaRun matching an unaccented query and previewing the text file](website/assets/demo-files.webp)
+![TiaRun matching a query and previewing a TOML file inline](website/assets/demo-files.webp)
 
 ## Configuration
 

@@ -1,10 +1,7 @@
 export global Theme {
     in-out property <bool> dark: true;
-    in-out property <bool> has_blur: true;
-    in-out property <float> surface_opacity: 0.95;
 
     // Geometry & Layout
-    out property <length> shadow_margin: 18px;
     out property <length> pill_width: 680px;
     out property <length> pill_height: 48px;
     out property <length> pill_radius: 24px;
@@ -12,80 +9,24 @@ export global Theme {
     out property <length> panel_width: 920px;
     out property <length> panel_height: 520px;
     out property <length> settings_height: 428px;
-    out property <length> preview_panel_width: 920px;
-    out property <length> preview_panel_height: 520px;
     out property <length> preview_pane_width: 540px;
     out property <length> panel_radius: 18px;
     out property <length> panel_header_height: 48px;
     out property <length> chips_height: 36px;
-    out property <length> row_height: 36px;
-    out property <length> panel_padding: 8px;
-    out property <length> content_inset: 16px;
-    out property <length> row_gap: 2px;
 
     // Animations
-    out property <duration> anim_open: 180ms;
     out property <duration> anim_expand: 220ms;
-    out property <duration> anim_row_slide: 120ms;
 
     // Typography
     out property <string> font_family: "Inter, SF Pro Text, Cantarell, Noto Sans, sans-serif";
-
-    // Text Colors
-    out property <color> text_primary: dark ? #F5F5F7 : #1D1D1F;
-    out property <color> text_secondary: dark ? #A1A1A6 : #6E6E73;
-    out property <color> text_placeholder: dark ? #9ca3af : #4b5563;
-    out property <color> text_ghost: dark ? rgba(142, 142, 147, 0.70) : rgba(110, 110, 115, 0.60);
-    out property <color> accent_blue: #0A84FF;
-    out property <color> accent_blue_text: dark ? #409CFF : #0A63D1;
-
-    out property <float> glass_clear_alpha: Math.max(0, surface_opacity - (1.0 - surface_opacity) * (has_blur ? 1.6 : 0.25));
-    out property <brush> glass_tint: dark ?
-        @linear-gradient(180deg,
-            rgba(78, 88, 105, surface_opacity) 0%,
-            rgba(47, 54, 66, glass_clear_alpha) 8%,
-            rgba(30, 35, 45, glass_clear_alpha) 35%,
-            rgba(23, 27, 36, glass_clear_alpha) 82%,
-            rgba(43, 53, 70, surface_opacity) 100%) :
-        @linear-gradient(180deg,
-            rgba(255, 255, 255, surface_opacity) 0%,
-            rgba(247, 250, 255, glass_clear_alpha) 10%,
-            rgba(229, 237, 250, glass_clear_alpha) 65%,
-            rgba(218, 230, 247, glass_clear_alpha) 93%,
-            rgba(243, 249, 255, surface_opacity) 100%);
-
-    // The same thin rim carries both bright reflections and the darker side.
-    out property <brush> glass_outline: dark ?
-        @linear-gradient(122deg, #c5ddff60 0%, #f8fcffba 10%, #afc8f345 29%, #b0c6ef26 55%, #97bdff88 85%, #eef5ffb3 100%) :
-        @linear-gradient(122deg, #f9fcffca 0%, #fffffff5 11%, #e3f0ffa0 29%, #506b944e 55%, #a1c5f4ad 85%, #fcffffea 100%);
-
-    out property <brush> glass_reflection: dark ?
-        @radial-gradient(circle, #c8dfff00 0%, #c8dfff30 1%, #c8dfff15 35%, #c8dfff00 70%) :
-        @radial-gradient(circle, #ffffff00 0%, #ffffffa0 1%, #ffffff45 35%, #ffffff00 70%);
-
-    out property <brush> glass_edge_bounce: dark ?
-        @radial-gradient(circle, #9ac6ff00 0%, #9ac6ff30 1%, #9ac6ff13 35%, #9ac6ff00 70%) :
-        @radial-gradient(circle, #b5d4ff00 0%, #b5d4ff77 1%, #b5d4ff30 35%, #b5d4ff00 70%);
-
-    // Drop Shadow Properties
-    out property <color> shadow_color_pill: dark ? rgba(0, 0, 0, 0.31) : rgba(18, 37, 65, 0.25);
-    out property <color> shadow_color_panel: dark ? rgba(0, 0, 0, 0.39) : rgba(14, 33, 62, 0.32);
 
     // Chips
     out property <length> chip_height: 24px;
     out property <length> chip_radius: 12px;
     out property <length> chip_padding_x: 10px;
-    out property <length> chip_gap: 6px;
     out property <color> chip_fill: dark ? rgba(255, 255, 255, 0.10) : rgba(0, 0, 0, 0.06);
     out property <color> chip_fill_hover: dark ? rgba(255, 255, 255, 0.18) : rgba(0, 0, 0, 0.12);
-    out property <color> chip_active_fill: rgba(10, 132, 255, 0.18);
     out property <color> chip_border: dark ? rgba(255, 255, 255, 0.20) : rgba(0, 0, 0, 0.15);
     out property <color> chip_text: dark ? #F5F5F7 : #1D1D1F;
     out property <color> chip_active_text: dark ? #409CFF : #0A63D1;
-
-    // Result Row
-    out property <color> row_selected_bg: dark ? rgba(255, 255, 255, 0.14) : rgba(0, 0, 0, 0.08);
-    out property <color> row_selected_border: dark ? rgba(255, 255, 255, 0.30) : rgba(0, 0, 0, 0.15);
-    out property <color> row_hover_bg: dark ? rgba(255, 255, 255, 0.08) : rgba(0, 0, 0, 0.04);
-    out property <color> row_icon_bg: dark ? rgba(255, 255, 255, 0.08) : rgba(0, 0, 0, 0.05);
 }

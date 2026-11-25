@@ -37,7 +37,7 @@ fn test_real_typing_simulation() {
         icon: None,
         category: Some("Browser".to_string()),
     });
-    let engine = Arc::new(LauncherEngine::with_temporary_index(config));
+    let engine = Arc::new(LauncherEngine::new(config));
     let icon_resolver = Arc::new(IconResolver::new());
     let current_results = Arc::new(std::sync::RwLock::new(Vec::new()));
 
@@ -47,7 +47,6 @@ fn test_real_typing_simulation() {
         let icon_resolver = icon_resolver.clone();
         let current_results = current_results.clone();
         let ui_weak = ui.as_weak();
-    ui.set_cfg_view_style("liquid_glass".into());
 
         ui.on_search_text_changed(move |text| {
             if let Some(ui) = ui_weak.upgrade() {
@@ -72,6 +71,8 @@ fn test_real_typing_simulation() {
                         icon: icon_img,
                         exec_or_path: item.exec_or_path.clone().into(),
                         subtitle: item.exec_or_path.clone().into(),
+                        cpu_text: "".into(),
+                        ram_text: "".into(),
                     });
                     current_items.push(item);
                 }

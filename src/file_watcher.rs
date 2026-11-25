@@ -1,8 +1,6 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, RecvTimeoutError, Sender};
+use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use std::time::{Duration, Instant};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use crate::config::Config;
 use crate::launcher::{ItemType, LauncherItem};
@@ -12,6 +10,79 @@ use crate::launcher::{ItemType, LauncherItem};
 /// ReadDirectoryChangesW watches a whole tree with a single handle, which is
 /// cheaper than thousands of per-directory handles, so it stays recursive there.
 const PER_DIRECTORY_WATCHES: bool = cfg!(target_os = "linux");
+
+const HARD_IGNORED_NAMES: &[&str] = &[
+    "node_modules", ".git", "target", "build", "dist", ".cache", "venv", ".venv",
+    "__pycache__", ".cargo", ".rustup", ".local", "AppData", ".Trash", ".Trash-1000",
+    ".idea", ".vscode", "vendor", "bin", "obj", ".next", ".nuxt", ".gradle", ".m2",
+    ".npm", ".nvm", "proc", "sys", "dev",
+];
+
+fn allows_watch_dir(path: &Path, ignored_dirs: &[String]) -> bool {
+    path.file_name().is_none_or(|name| {
+        name.to_str().is_some_and(|name| {
+            !name.starts_with('.')
+                && !HARD_IGNORED_NAMES.iter().any(|ignored| ignored.eq_ignore_ascii_case(name))
+                && !ignored_dirs.iter().any(|ignored| ignored.eq_ignore_ascii_case(name))
+        })
+    })
+}
+
+fn clean_path_prefix(path: &Path) -> &Path {
+    let s = path.to_str().unwrap_or("");
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        Path::new(stripped)
+    } else {
+        path
+    }
+}
+
+fn strip_prefix_case_insensitive(path: &Path, prefix: &Path) -> Option<PathBuf> {
+    let clean_path = clean_path_prefix(path);
+    let clean_prefix = clean_path_prefix(prefix);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::path::Component;
+        let mut path_comps = clean_path.components();
+        let mut prefix_comps = clean_prefix.components();
+
+        loop {
+            match (prefix_comps.next(), path_comps.next()) {
+                (None, Some(rem)) => {
+                    let mut result = PathBuf::from(rem.as_os_str());
+                    for comp in path_comps {
+                        result.push(comp.as_os_str());
+                    }
+                    return Some(result);
+                }
+                (None, None) => return Some(PathBuf::new()),
+                (Some(p_comp), Some(c_comp)) => {
+                    let match_comp = match (p_comp, c_comp) {
+                        (Component::Prefix(p1), Component::Prefix(p2)) => {
+                            p1.as_os_str().to_string_lossy().eq_ignore_ascii_case(&p2.as_os_str().to_string_lossy())
+                        }
+                        (Component::RootDir, Component::RootDir) => true,
+                        (Component::CurDir, Component::CurDir) => true,
+                        (Component::ParentDir, Component::ParentDir) => true,
+                        (Component::Normal(n1), Component::Normal(n2)) => {
+                            n1.to_string_lossy().eq_ignore_ascii_case(&n2.to_string_lossy())
+                        }
+                        _ => false,
+                    };
+                    if !match_comp {
+                        return None;
+                    }
+                }
+                (Some(_), None) => return None,
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        clean_path.strip_prefix(clean_prefix).ok().map(|p| p.to_path_buf())
+    }
+}
 
 pub struct FileWatcher {
     _watcher: Arc<Mutex<RecommendedWatcher>>,
@@ -25,7 +96,6 @@ impl FileWatcher {
     pub fn start(
         files: Arc<RwLock<Vec<LauncherItem>>>,
         config: &Config,
-        search_index: Option<Arc<crate::search_index::SearchIndexEngine>>,
     ) -> Option<Self> {
         let mut recursive_dirs = Vec::new();
         if let Some(desktop) = dirs::desktop_dir() {
@@ -58,7 +128,7 @@ impl FileWatcher {
             }
         }
 
-        Self::start_with_all_dirs(files, config, recursive_dirs, non_recursive_dirs, search_index)
+        Self::start_with_all_dirs(files, config, recursive_dirs, non_recursive_dirs)
     }
 
     /// Starts watching specific directories recursively.
@@ -67,7 +137,7 @@ impl FileWatcher {
         config: &Config,
         dirs: Vec<PathBuf>,
     ) -> Option<Self> {
-        Self::start_with_all_dirs(files, config, dirs, Vec::new(), None)
+        Self::start_with_all_dirs(files, config, dirs, Vec::new())
     }
 
     /// Starts watching recursive and non-recursive directories for file creation/modification/removal.
@@ -76,7 +146,6 @@ impl FileWatcher {
         config: &Config,
         recursive_dirs: Vec<PathBuf>,
         non_recursive_dirs: Vec<PathBuf>,
-        search_index: Option<Arc<crate::search_index::SearchIndexEngine>>,
     ) -> Option<Self> {
         let ignored_dirs = config.search.ignored_dirs.clone();
         let ignored_exts = config.search.ignored_extensions.clone();
@@ -87,16 +156,12 @@ impl FileWatcher {
             }
         }
         let watch_roots = Arc::new(all_roots);
-
-        let scope = Arc::new(crate::search_index::scope::SearchScope::new(&config.search));
-        let index_sender = search_index.map(Self::spawn_index_worker);
         let (new_dirs, new_dirs_receiver) = mpsc::channel::<PathBuf>();
 
         let callback = {
             let files = files.clone();
             let roots = watch_roots.clone();
             let recursive_roots = recursive_dirs.clone();
-            let index_sender = index_sender.clone();
             let ignored_dirs = ignored_dirs.clone();
             let ignored_exts = ignored_exts.clone();
             let new_dirs = new_dirs.clone();
@@ -118,7 +183,7 @@ impl FileWatcher {
                         }
                     }
                 }
-                Self::handle_event(&files, &event, &ignored_dirs, &ignored_exts, &roots, &index_sender);
+                Self::handle_event(&files, &event, &ignored_dirs, &ignored_exts, &roots);
             }
         };
         let watcher = Arc::new(Mutex::new(RecommendedWatcher::new(callback, notify::Config::default()).ok()?));
@@ -132,7 +197,7 @@ impl FileWatcher {
             let mut guard = watcher.lock().unwrap_or_else(|error| error.into_inner());
             for dir in &recursive_dirs {
                 if PER_DIRECTORY_WATCHES {
-                    for sub in Self::watchable_dirs(dir, &scope) {
+                    for sub in Self::watchable_dirs(dir, &ignored_dirs) {
                         if guard.watch(&sub, RecursiveMode::NonRecursive).is_ok() {
                             watched_any = true;
                         }
@@ -154,21 +219,19 @@ impl FileWatcher {
         Self::spawn_new_dir_watcher(
             Arc::downgrade(&watcher),
             new_dirs_receiver,
-            scope,
             files,
             ignored_dirs,
             ignored_exts,
             watch_roots,
-            index_sender,
         );
         Some(Self { _watcher: watcher, _new_dirs: new_dirs })
     }
 
-    /// `root` and every directory below it that search indexing covers.
-    fn watchable_dirs(root: &Path, scope: &crate::search_index::scope::SearchScope) -> Vec<PathBuf> {
+    /// `root` and every directory below it that file watching covers.
+    fn watchable_dirs(root: &Path, ignored_dirs: &[String]) -> Vec<PathBuf> {
         walkdir::WalkDir::new(root)
             .into_iter()
-            .filter_entry(|entry| entry.depth() == 0 || (entry.file_type().is_dir() && scope.allows_name(entry.path())))
+            .filter_entry(|entry| entry.depth() == 0 || (entry.file_type().is_dir() && allows_watch_dir(entry.path(), ignored_dirs)))
             .flatten()
             .filter(|entry| entry.file_type().is_dir())
             .map(walkdir::DirEntry::into_path)
@@ -178,27 +241,24 @@ impl FileWatcher {
     /// Picks up directories that appear after startup: lists the files already
     /// inside them (an extracted archive, a moved-in or renamed folder) and, on
     /// Linux, adds their watches.
-    #[allow(clippy::too_many_arguments)]
     fn spawn_new_dir_watcher(
         watcher: Weak<Mutex<RecommendedWatcher>>,
         receiver: mpsc::Receiver<PathBuf>,
-        scope: Arc<crate::search_index::scope::SearchScope>,
         files: Arc<RwLock<Vec<LauncherItem>>>,
         ignored_dirs: Vec<String>,
         ignored_exts: Vec<String>,
         watch_roots: Arc<Vec<PathBuf>>,
-        index_sender: Option<Sender<PathBuf>>,
     ) {
         let _ = std::thread::Builder::new()
             .name("tiarun-watch-dirs".to_string())
             .spawn(move || {
                 while let Ok(dir) = receiver.recv() {
-                    if !scope.allows_name(&dir) {
+                    if !allows_watch_dir(&dir, &ignored_dirs) {
                         continue;
                     }
                     let Some(watcher) = watcher.upgrade() else { break };
                     if PER_DIRECTORY_WATCHES {
-                        for sub in Self::watchable_dirs(&dir, &scope) {
+                        for sub in Self::watchable_dirs(&dir, &ignored_dirs) {
                             let _ = watcher.lock().unwrap_or_else(|error| error.into_inner())
                                 .watch(&sub, RecursiveMode::NonRecursive);
                         }
@@ -208,60 +268,17 @@ impl FileWatcher {
                     let created: Vec<PathBuf> = walkdir::WalkDir::new(&dir)
                         .min_depth(1)
                         .into_iter()
-                        .filter_entry(|entry| scope.allows_name(entry.path()))
+                        .filter_entry(|entry| allows_watch_dir(entry.path(), &ignored_dirs))
                         .flatten()
                         .map(walkdir::DirEntry::into_path)
                         .collect();
                     if !created.is_empty() {
                         let mut event = Event::new(EventKind::Create(notify::event::CreateKind::Any));
                         event.paths = created;
-                        Self::handle_event(&files, &event, &ignored_dirs, &ignored_exts, &watch_roots, &index_sender);
+                        Self::handle_event(&files, &event, &ignored_dirs, &ignored_exts, &watch_roots);
                     }
                 }
             });
-    }
-
-    /// Editors and downloads emit bursts of modify events while a file is being
-    /// written. Indexing on every event re-extracted the document (PDFs included)
-    /// each time; this worker waits until a path has been quiet before indexing it.
-    fn spawn_index_worker(index: Arc<crate::search_index::SearchIndexEngine>) -> Sender<PathBuf> {
-        const QUIET: Duration = Duration::from_millis(500);
-        let (send, receive) = mpsc::channel::<PathBuf>();
-        let _ = std::thread::Builder::new()
-            .name("tiarun-watch-index".to_string())
-            .spawn(move || {
-                let mut pending: HashMap<PathBuf, Instant> = HashMap::new();
-                loop {
-                    let next = if pending.is_empty() {
-                        receive.recv().map_err(|_| RecvTimeoutError::Disconnected)
-                    } else {
-                        receive.recv_timeout(QUIET / 4)
-                    };
-                    match next {
-                        Ok(path) => {
-                            pending.insert(path, Instant::now());
-                        }
-                        Err(RecvTimeoutError::Timeout) => {}
-                        Err(RecvTimeoutError::Disconnected) => break,
-                    }
-                    let now = Instant::now();
-                    let settled: Vec<PathBuf> = pending
-                        .iter()
-                        .filter(|(_, changed)| now.duration_since(**changed) >= QUIET)
-                        .map(|(path, _)| path.clone())
-                        .collect();
-                    for path in settled {
-                        pending.remove(&path);
-                        if path.is_file() {
-                            index.index_file(&path);
-                        } else if !path.exists() {
-                            // A deleted or renamed-away directory removes its whole subtree.
-                            index.delete_tree(&path);
-                        }
-                    }
-                }
-            });
-        send
     }
 
     fn should_ignore(
@@ -319,11 +336,14 @@ impl FileWatcher {
         }
 
         let path_str = path.to_string_lossy().to_string();
-        let item_type = if path.is_dir() {
+        let meta = std::fs::metadata(path).ok();
+        let is_dir = meta.as_ref().map(|m| m.is_dir()).unwrap_or_else(|| path.is_dir());
+        let item_type = if is_dir {
             ItemType::Dir
         } else {
             ItemType::File
         };
+        let file_size = if is_dir { None } else { meta.map(|m| m.len()) };
 
         let desc = path.parent().map(|p| {
             let s = p.to_string_lossy().to_string();
@@ -336,14 +356,10 @@ impl FileWatcher {
             s
         });
 
-        Some(LauncherItem::new(
-            name,
-            path_str,
-            item_type,
-            desc,
-            false,
-            None,
-        ))
+        Some(
+            LauncherItem::new(name, path_str, item_type, desc, false, None)
+                .with_file_size(file_size),
+        )
     }
 
     fn handle_event(
@@ -352,7 +368,6 @@ impl FileWatcher {
         ignored_dirs: &[String],
         ignored_exts: &[String],
         watch_roots: &[PathBuf],
-        search_index: &Option<Sender<PathBuf>>,
     ) {
         use notify::event::{ModifyKind, RenameMode};
         // Paths that no longer exist: deletions, and the old name of a rename.
@@ -365,9 +380,6 @@ impl FileWatcher {
             // A directory takes everything below it along.
             if let Ok(mut lock) = files.write() {
                 lock.retain(|f| !Self::is_same_or_inside(Path::new(&f.exec_or_path), path));
-            }
-            if let Some(index) = search_index {
-                let _ = index.send(path.clone());
             }
         }
 
@@ -398,12 +410,6 @@ impl FileWatcher {
                             }
                         }
                     }
-
-                    if path.is_file() {
-                        if let Some(index) = search_index {
-                            let _ = index.send(path.clone());
-                        }
-                    }
                 }
             }
             _ => {}
@@ -413,7 +419,7 @@ impl FileWatcher {
     /// `path == ancestor` or `path` lies below it (case-insensitive on Windows,
     /// ignoring the `\\?\` verbatim prefix).
     fn is_same_or_inside(path: &Path, ancestor: &Path) -> bool {
-        crate::search_index::scope::strip_prefix_case_insensitive(path, ancestor).is_some()
+        strip_prefix_case_insensitive(path, ancestor).is_some()
     }
 }
 
@@ -467,65 +473,6 @@ mod tests {
             }
         }
         assert!(removed, "File watcher should remove deleted file from launcher items");
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
-    }
-
-    #[test]
-    fn test_file_watcher_updates_search_index() {
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_watch_idx_{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        let _ = std::fs::create_dir_all(&temp_dir);
-
-        let files = Arc::new(RwLock::new(Vec::new()));
-        let mut config = Config::default();
-        config.search.paths.push(crate::config::SearchPathConfig {
-            path: temp_dir.to_str().unwrap().to_owned(),
-            depth: 1,
-            max_depth: Some(1),
-            exclude: Vec::new(),
-        });
-        let db_path = temp_dir.join("index.db");
-        let search_index = Arc::new(crate::search_index::SearchIndexEngine::with_db_path(&config, db_path));
-
-        let _watcher = FileWatcher::start_with_all_dirs(
-            files.clone(),
-            &config,
-            vec![temp_dir.clone()],
-            Vec::new(),
-            Some(search_index.clone()),
-        );
-        assert!(_watcher.is_some());
-
-        // Create a new text file with unique content
-        let new_file = temp_dir.join("realtime_doc.txt");
-        std::fs::write(&new_file, "this file has special_unique_phrase_2026 inside").unwrap();
-
-        // Give the file watcher thread a window to process and index the event
-        let mut indexed = false;
-        for _ in 0..40 {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            let matches = search_index.search_content("special_unique_phrase_2026", 10, &|| false);
-            if !matches.is_empty() {
-                indexed = true;
-                assert_eq!(matches[0].file_name, "realtime_doc.txt");
-                break;
-            }
-        }
-        assert!(indexed, "FileWatcher should index newly created file into search index");
-
-        // Remove the file
-        let _ = std::fs::remove_file(&new_file);
-        let mut removed = false;
-        for _ in 0..40 {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            let matches = search_index.search_content("special_unique_phrase_2026", 10, &|| false);
-            if matches.is_empty() {
-                removed = true;
-                break;
-            }
-        }
-        assert!(removed, "FileWatcher should delete removed file from search index");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -587,14 +534,12 @@ mod tests {
             max_depth: Some(5),
             exclude: Vec::new(),
         });
-        let index = Arc::new(crate::search_index::SearchIndexEngine::with_db_path(&config, temp_dir.join("index.db")));
         let files = Arc::new(RwLock::new(Vec::new()));
         let _watcher = FileWatcher::start_with_all_dirs(
             files.clone(),
             &config,
             vec![temp_dir.clone()],
             Vec::new(),
-            Some(index.clone()),
         );
         let wait = |check: &dyn Fn() -> bool| {
             (0..50).any(|_| {
@@ -603,16 +548,15 @@ mod tests {
             })
         };
         let listed = |path: &Path| files.read().unwrap().iter().any(|f| Path::new(&f.exec_or_path) == path);
-        let indexed = |name: &str| index.search_files(name, 5).into_iter().map(|m| PathBuf::from(m.path)).collect::<Vec<_>>();
 
         let old_file = temp_dir.join("old_name/sub/report_tiarun.txt");
         std::fs::write(&old_file, "x").unwrap();
-        assert!(wait(&|| listed(&old_file) && indexed("report_tiarun") == [old_file.clone()]));
+        assert!(wait(&|| listed(&old_file)));
 
         std::fs::rename(temp_dir.join("old_name"), temp_dir.join("new_name")).unwrap();
         let new_file = temp_dir.join("new_name/sub/report_tiarun.txt");
         assert!(
-            wait(&|| listed(&new_file) && !listed(&old_file) && indexed("report_tiarun") == [new_file.clone()]),
+            wait(&|| listed(&new_file) && !listed(&old_file)),
             "renamed directory should replace old paths"
         );
 

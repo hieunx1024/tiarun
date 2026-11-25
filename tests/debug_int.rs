@@ -6,7 +6,7 @@ use tiarun::icon_resolver::IconResolver;
 fn test_live_search_int() {
     println!("=== Testing Launcher on Live System ===");
     let config = Config::load();
-    let engine = LauncherEngine::with_temporary_index(config);
+    let engine = LauncherEngine::new(config);
     let resolver = IconResolver::new();
 
     println!("Indexed {} apps from live system.", engine.apps.len());

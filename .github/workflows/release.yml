@@ -42,10 +42,13 @@ jobs:
 
       - name: Package Linux tar.gz
         run: |
-          mkdir -p target/release-linux
+          mkdir -p target/release-linux/assets
           cp target/release/tiarun target/release-linux/
+          cp installer/linux/install.sh target/release-linux/
+          chmod 755 target/release-linux/tiarun target/release-linux/install.sh
+          cp assets/tiarun.desktop assets/tiarun.png assets/tiarun.svg target/release-linux/assets/
           cp README.md LICENSE target/release-linux/ 2>/dev/null || true
-          tar -czvf target/tiarun-linux-x86_64.tar.gz -C target/release-linux tiarun
+          tar -czvf target/tiarun-linux-x86_64.tar.gz -C target/release-linux .
 
       - name: Build Debian (.deb) package
         run: |
@@ -57,13 +60,19 @@ jobs:
           cp assets/tiarun.png target/deb-pkg/usr/share/pixmaps/
           cp assets/tiarun.svg target/deb-pkg/usr/share/pixmaps/
           cp assets/tiarun.svg target/deb-pkg/usr/share/icons/hicolor/scalable/apps/
+          mkdir -p target/shlibs-tmp/debian
+          printf 'Source: tiarun\n\nPackage: tiarun\nArchitecture: amd64\n' > target/shlibs-tmp/debian/control
+          SHLIBS_DEPS=$(cd target/shlibs-tmp && dpkg-shlibdeps -O ../../target/release/tiarun | sed 's/^shlibs:Depends=//')
+          rm -rf target/shlibs-tmp
           cat << EOF > target/deb-pkg/DEBIAN/control
           Package: tiarun
           Version: ${VERSION}
           Section: utils
           Priority: optional
           Architecture: amd64
-          Maintainer: Hieu Nguyen <hieunx@outlook.com>
+          Depends: ${SHLIBS_DEPS:+${SHLIBS_DEPS}, }libxkbcommon0, libxkbcommon-x11-0, libfontconfig1, libwayland-client0, libegl1, libgl1, libx11-6, libx11-xcb1
+          Recommends: wl-clipboard
+          Maintainer: Hieu Nguyen <work.hieunguyen@gmail.com>
           Description: Think. Search. Run. - High-performance desktop launcher in Rust (<5ms)
           EOF
           cat << 'EOF' > target/deb-pkg/DEBIAN/postinst

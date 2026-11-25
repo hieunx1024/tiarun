@@ -29,7 +29,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <script src="app.js?v=3" defer></script>
   <script type="application/ld+json">
     {
@@ -39,10 +39,10 @@
           "@type": "SoftwareApplication",
           "name": "TiaRun",
           "url": "https://tiarun.vercel.app/",
-          "description": "Launcher điều khiển bằng bàn phím, hỗ trợ tìm kiếm tiếng Việt không dấu.",
+          "description": "Launcher điều khiển bằng bàn phím cho Windows và Linux, hỗ trợ tìm kiếm tiếng Việt không dấu, chuyển cửa sổ kèm CPU/RAM, lịch sử clipboard và lệnh shell.",
           "operatingSystem": ["Windows", "Linux"],
           "applicationCategory": "UtilitiesApplication",
-          "softwareVersion": "1.1.0",
+          "softwareVersion": "1.2.0",
           "isAccessibleForFree": true,
           "license": "https://opensource.org/licenses/MIT",
           "offers": { "@type": "Offer", "price": 0, "priceCurrency": "USD" },
@@ -63,15 +63,15 @@
               "name": "TiaRun tìm kiếm dữ liệu ở đâu?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "TiaRun tìm ứng dụng và tệp trên máy. Khi bạn chọn kết quả tìm trên web, truy vấn sẽ mở trong trình duyệt. Tính năng đổi tiền tệ có thể kết nối mạng để cập nhật tỷ giá."
+                "text": "TiaRun tìm ứng dụng và tệp trên máy. Khi bạn chọn kết quả tìm trên web, truy vấn sẽ mở trong trình duyệt. Tính năng đổi tiền tệ có thể kết nối mạng để cập nhật tỷ giá nền."
               }
             },
             {
               "@type": "Question",
-              "name": "Phím tắt trên Linux chưa hoạt động thì sao?",
+              "name": "Phím tắt hoặc chuyển cửa sổ trên Linux cần cài thêm gì không?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Mở cài đặt phím tắt của môi trường desktop và gán Ctrl + Alt + Space cho lệnh tiarun. Nếu dùng bản giải nén, nhập đường dẫn đầy đủ đến tệp thực thi."
+                "text": "Mở cài đặt phím tắt của môi trường desktop và gán Ctrl + Alt + Space cho lệnh tiarun. Chuyển cửa sổ chạy sẵn trên Windows, Sway, Hyprland và mọi môi trường X11/XWayland; KDE Wayland cần kdotool, GNOME Wayland cần extension Window Calls, còn clipboard Wayland khuyến nghị wl-clipboard."
               }
             },
             {
@@ -79,7 +79,7 @@
               "name": "TiaRun mở lại cửa sổ bằng cách nào?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "TiaRun tạo cửa sổ một lần rồi giữ tiến trình chạy nền. Lần gọi tiếp theo gửi tín hiệu đến tiến trình đó để hiện hoặc ẩn cửa sổ."
+                "text": "TiaRun tạo cửa sổ một lần rồi giữ tiến trình chạy nền. Lần gọi tiếp theo gửi tín hiệu qua socket đến tiến trình đó để hiện hoặc ẩn cửa sổ tức thì."
               }
             },
             {
@@ -87,7 +87,7 @@
               "name": "Tôi có thể tự chọn thư mục tìm kiếm không?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Dùng Ctrl + , để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu và danh sách loại trừ trong tệp cấu hình TOML."
+                "text": "Dùng Ctrl + , để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu, công cụ tìm web và danh sách loại trừ trong tệp cấu hình TOML."
               }
             }
           ]
@@ -128,22 +128,23 @@
     <section class="hero container" aria-labelledby="headline">
       <div class="hero-copy">
         <h1 id="headline">Mở ứng dụng và tìm tệp bằng bàn phím</h1>
-        <p class="lede">Tìm tệp tiếng Việt không dấu, xem trước nội dung và tính toán ngay trong thanh lệnh TiaRun.</p>
+        <p class="lede">Tìm ứng dụng, tệp tiếng Việt không dấu, xem trước nội dung, chuyển cửa sổ kèm CPU/RAM và tính toán ngay trong thanh lệnh TiaRun.</p>
         <div class="hero-actions">
           <a class="button primary" id="hero-download" href="#download">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
             <span>Tải TiaRun</span>
           </a>
           <a class="text-link" href="#gallery">Xem tính năng</a>
+          <a class="text-link" href="#usage">Hướng dẫn dùng</a>
         </div>
         <p class="hero-meta">Windows và Linux (x86-64) · Miễn phí, mã nguồn mở MIT</p>
       </div>
 
       <figure class="hero-preview">
         <div class="hero-screenshot">
-          <img src="assets/launcher-home.png" width="1028" height="583" alt="TiaRun với ô tìm kiếm trống, tab Apps đang mở và danh sách ứng dụng bên dưới" fetchpriority="high">
+          <img src="assets/launcher-home.png" width="1028" height="583" alt="TiaRun với ô tìm kiếm trống, 3 chip Apps, Files, Windows và danh sách ứng dụng bên dưới" fetchpriority="high">
         </div>
-        <figcaption>Chọn ứng dụng rồi nhấn <kbd>Enter</kbd> để mở.</figcaption>
+        <figcaption>Chọn ứng dụng rồi nhấn <kbd>Enter</kbd> để mở, hoặc <kbd>Tab</kbd> để đổi phạm vi.</figcaption>
       </figure>
     </section>
 
@@ -160,6 +161,8 @@
             <button type="button" id="tab-calc" role="tab" aria-selected="false" aria-controls="panel-calc" tabindex="-1"><span>Tính và quy đổi</span></button>
             <button type="button" id="tab-windows" role="tab" aria-selected="false" aria-controls="panel-windows" tabindex="-1"><span>Chuyển cửa sổ</span></button>
             <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1"><span>Lịch sử clipboard</span></button>
+            <button type="button" id="tab-shell" role="tab" aria-selected="false" aria-controls="panel-shell" tabindex="-1"><span>Lệnh terminal</span></button>
+            <button type="button" id="tab-modes" role="tab" aria-selected="false" aria-controls="panel-modes" tabindex="-1"><span>Chế độ &amp; Plugin</span></button>
             <button type="button" id="tab-system" role="tab" aria-selected="false" aria-controls="panel-system" tabindex="-1"><span>Lệnh hệ thống</span></button>
             <button type="button" id="tab-settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1"><span>Cài đặt</span></button>
           </div>
@@ -174,31 +177,39 @@
             </div>
             <figure class="gallery-panel" id="panel-apps">
               <img src="assets/demo-apps-dark.webp" width="880" height="540" alt="Tìm Firefox trong TiaRun" loading="lazy" decoding="async">
-              <figcaption><code>firefox</code><p>Gõ tên ứng dụng rồi nhấn <kbd>Enter</kbd> để mở.</p></figcaption>
+              <figcaption><code>firefox</code><p>Tìm ứng dụng theo tần suất sử dụng (hỗ trợ không dấu). Nhấn <kbd>Enter</kbd> để mở, <kbd>Ctrl</kbd> + <kbd>C</kbd> để sao chép.</p></figcaption>
             </figure>
             <figure class="gallery-panel" id="panel-files" hidden>
               <img src="assets/demo-files-dark.webp" width="880" height="540" alt="Tìm Cargo.toml và xem trước nội dung tệp" loading="lazy" decoding="async">
-              <figcaption><code>@f Cargo.toml</code><p>Gõ tên tệp để tìm và xem trước nội dung, ảnh hoặc thư mục. Với tên tiếng Việt, gõ <code>@f ke hoach</code> để tìm “Kế hoạch”. Nhấn <kbd>→</kbd> để vào thư mục con.</p></figcaption>
+              <figcaption><code>@f Cargo.toml</code><p>Tìm tệp tiếng Việt không dấu (vd: <code>@f ke hoach</code>) và xem trước mã nguồn, văn bản, ảnh hoặc thư mục. Nhấn <kbd>→</kbd> vào thư mục con, <kbd>←</kbd> lùi lại, <kbd>Alt</kbd> + <kbd>T</kbd> mở terminal.</p></figcaption>
             </figure>
             <figure class="gallery-panel" id="panel-calc" hidden>
               <img src="assets/demo-calc-dark.webp" width="880" height="540" alt="Kết quả quy đổi 25 kilômét sang dặm" loading="lazy" decoding="async">
-              <figcaption><code>25 km to miles</code><p>Gõ phép tính, đổi đơn vị hoặc tỷ giá tiền tệ ngay trong thanh lệnh. Nhấn <kbd>Enter</kbd> để sao chép kết quả.</p></figcaption>
+              <figcaption><code>25 km to miles</code><p>Tính toán (hỗ trợ hex/nhị phân), quy đổi đơn vị và tỷ giá tiền tệ (tự cập nhật nền, dùng được offline). Nhấn <kbd>Enter</kbd> để sao chép kết quả.</p></figcaption>
             </figure>
             <figure class="gallery-panel" id="panel-windows" hidden>
-              <img src="assets/demo-windows-dark.webp" width="880" height="540" alt="Danh sách cửa sổ đang mở trong TiaRun" loading="lazy" decoding="async">
-              <figcaption><code>@w</code><p>Tìm và chuyển đến cửa sổ đang mở. Trên Linux, tính năng hỗ trợ Hyprland, Sway hoặc qua <code>wmctrl</code>.</p></figcaption>
+              <img src="assets/demo-windows-dark.webp" width="880" height="540" alt="Danh sách cửa sổ đang mở kèm CPU và RAM trong TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>@w</code><p>Xem cửa sổ đang mở kèm mức dùng CPU% và RAM, nhấn <kbd>Enter</kbd> để chuyển tới hoặc <kbd>Alt</kbd> + <kbd>K</kbd> để tắt tiến trình. Hỗ trợ Windows, Hyprland, Sway, KDE Wayland (<code>kdotool</code>), GNOME Wayland (<code>Window Calls</code>) và X11.</p></figcaption>
             </figure>
             <figure class="gallery-panel" id="panel-clipboard" hidden>
               <img src="assets/demo-clipboard-dark.webp" width="880" height="540" alt="Danh sách các đoạn văn bản đã sao chép" loading="lazy" decoding="async">
-              <figcaption><code>@c</code><p>Tìm lại đoạn văn bản đã sao chép trước đó rồi nhấn <kbd>Enter</kbd> để sao chép lại.</p></figcaption>
+              <figcaption><code>@c</code><p>Tự động lưu lịch sử clipboard trên Windows, Wayland và X11. Tìm lại rồi nhấn <kbd>Enter</kbd> hoặc <kbd>Ctrl</kbd> + <kbd>C</kbd> để sao chép lại.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-shell" hidden>
+              <img src="assets/demo-shell-dark.webp" width="880" height="540" alt="Chạy lệnh terminal bằng tiền tố dấu chấm than trong TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>! ls -la</code><p>Chạy nhanh bất kỳ lệnh shell nào trong terminal mặc định; nhấn <kbd>↑</kbd> <kbd>↓</kbd> để gọi lại các lệnh đã chạy trước đó.</p></figcaption>
+            </figure>
+            <figure class="gallery-panel" id="panel-modes" hidden>
+              <img src="assets/demo-modes-dark.webp" width="880" height="540" alt="Danh sách các chế độ tìm kiếm và plugin khi gõ @" loading="lazy" decoding="async">
+              <figcaption><code>@</code><p>Duyệt nhanh toàn bộ chế độ tích hợp và chạy script plugin tùy biến kiểu Rofi đặt trong thư mục cấu hình <code>plugins/</code>.</p></figcaption>
             </figure>
             <figure class="gallery-panel" id="panel-system" hidden>
               <img src="assets/demo-system-dark.webp" width="880" height="540" alt="Danh sách thao tác hệ thống trong TiaRun" loading="lazy" decoding="async">
-              <figcaption><code>@sys</code><p>Tìm thao tác như khóa màn hình, tạm nghỉ hoặc khởi động lại. Các thao tác có thể khác nhau theo hệ điều hành.</p></figcaption>
+              <figcaption><code>@sys</code><p>Khóa màn hình, tạm nghỉ, khởi động lại, tắt máy hoặc đăng xuất (hoặc gõ thẳng <code>lock</code>, <code>sleep</code>, <code>restart</code>).</p></figcaption>
             </figure>
             <figure class="gallery-panel" id="panel-settings" hidden>
-              <img src="assets/demo-settings-dark.webp" width="880" height="540" alt="Phần cài đặt giao diện của TiaRun" loading="lazy" decoding="async">
-              <figcaption><code>Ctrl + ,</code><p>Đổi giao diện (Sáng/Tối/Hệ thống), độ trong suốt, tự khởi động cùng máy và tùy chỉnh tìm kiếm trong phần cài đặt.</p></figcaption>
+              <img src="assets/demo-settings-dark.webp" width="880" height="540" alt="Phần cài đặt giao diện và tìm kiếm của TiaRun" loading="lazy" decoding="async">
+              <figcaption><code>Ctrl + ,</code><p>Đổi Sáng/Tối/Hệ thống, độ trong suốt (70%–100%), chế độ thu gọn, thanh phím tắt đáy cửa sổ, tự khởi động hoặc sửa <code>config.toml</code>; gõ <code>@theme</code> để đổi nhanh.</p></figcaption>
             </figure>
             <noscript>
               <nav class="gallery-image-links" aria-label="Các ảnh chụp khác">
@@ -206,6 +217,8 @@
                 <a class="text-link" href="assets/demo-calc-dark.webp">Tính và quy đổi</a>
                 <a class="text-link" href="assets/demo-windows-dark.webp">Chuyển cửa sổ</a>
                 <a class="text-link" href="assets/demo-clipboard-dark.webp">Lịch sử clipboard</a>
+                <a class="text-link" href="assets/demo-shell-dark.webp">Lệnh terminal</a>
+                <a class="text-link" href="assets/demo-modes-dark.webp">Chế độ &amp; Plugin</a>
                 <a class="text-link" href="assets/demo-system-dark.webp">Lệnh hệ thống</a>
                 <a class="text-link" href="assets/demo-settings-dark.webp">Cài đặt</a>
               </nav>
@@ -216,22 +229,74 @@
     </section>
 
     <section class="section usage-section" id="usage" aria-labelledby="usage-heading">
-      <div class="container usage-grid">
-        <div class="section-heading">
-          <h2 id="usage-heading">Bắt đầu sử dụng</h2>
-          <p>Mở TiaRun sau khi cài đặt, rồi dùng phím tắt để hiện hoặc ẩn thanh lệnh.</p>
+      <div class="container">
+        <div class="usage-header">
+          <div class="section-heading">
+            <h2 id="usage-heading">Hướng dẫn sử dụng</h2>
+            <p>Mở TiaRun một lần sau khi cài đặt, rồi dùng phím tắt để bật/ẩn thanh lệnh bất cứ lúc nào. Nhấn <kbd>F1</kbd> hoặc gõ <code>?</code> ngay trong app để xem bảng tra cứu nhanh.</p>
+          </div>
           <p class="usage-keys key-group"><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd></p>
-          <p>Dùng <kbd>↑</kbd> <kbd>↓</kbd> để chọn, <kbd>Enter</kbd> để thực hiện và <kbd>Esc</kbd> để đóng.</p>
-          <p>Dùng <kbd>Tab</kbd> hoặc <kbd>Shift</kbd> + <kbd>Tab</kbd> để chuyển phạm vi (Ứng dụng, Tệp, Cửa sổ); nhấn <kbd>F1</kbd> hoặc gõ <code>?</code> để xem bảng phím tắt.</p>
         </div>
 
-        <dl class="commands" aria-label="Các lệnh để bắt đầu">
-          <div><dt><code>firefox</code></dt><dd>Mở một ứng dụng đã cài</dd></div>
-          <div><dt><code>@f ke hoach</code></dt><dd>Tìm và xem trước tệp “Kế hoạch”</dd></div>
-          <div><dt><code>500 * 12</code></dt><dd>Tính toán, quy đổi đơn vị/tiền tệ và sao chép kết quả</dd></div>
-          <div><dt><code>! ls -la</code></dt><dd>Chạy lệnh shell trong terminal (hỗ trợ lịch sử <kbd>↑</kbd> <kbd>↓</kbd>)</dd></div>
-          <div><dt><code>@w</code> <code>@c</code> <code>@sys</code> <code>@theme</code></dt><dd>Cửa sổ, clipboard, lệnh hệ thống và giao diện</dd></div>
-        </dl>
+        <div class="usage-steps" aria-label="Quy trình 3 bước">
+          <article class="usage-step">
+            <h3><span class="usage-step-num" aria-hidden="true">1</span> Chọn phạm vi nhanh</h3>
+            <p>Nhấn <kbd>Tab</kbd> hoặc <kbd>Shift</kbd> + <kbd>Tab</kbd> để luân chuyển giữa <strong>Apps</strong>, <strong>Files</strong> và <strong>Windows</strong>, hoặc bấm trực tiếp vào chip.</p>
+          </article>
+          <article class="usage-step">
+            <h3><span class="usage-step-num" aria-hidden="true">2</span> Gõ tự nhiên hoặc tiền tố</h3>
+            <p>Gõ tên app, phép tính, đường dẫn (<code>~/...</code>, <code>C:\...</code>) hoặc thêm tiền tố <code>@</code>, <code>!</code>, <code>?</code> để vào chế độ chuyên biệt.</p>
+          </article>
+          <article class="usage-step">
+            <h3><span class="usage-step-num" aria-hidden="true">3</span> Thao tác không rời tay</h3>
+            <p>Dùng <kbd>↑</kbd> <kbd>↓</kbd> chọn, <kbd>Enter</kbd> thực hiện, <kbd>Ctrl</kbd> + <kbd>C</kbd> sao chép thông minh, <kbd>Alt</kbd> + <kbd>T</kbd> mở terminal, <kbd>Esc</kbd> đóng.</p>
+          </article>
+        </div>
+
+        <div class="usage-panels">
+          <div class="usage-panel">
+            <h3>Tiền tố &amp; chế độ tìm kiếm</h3>
+            <dl class="commands" aria-label="Các cú pháp tìm kiếm">
+              <div><dt><code>firefox</code></dt><dd>Tìm và mở ứng dụng (hỗ trợ tiếng Việt không dấu)</dd></div>
+              <div><dt><code>@f ke hoach</code> · <code>~/...</code></dt><dd>Tìm tệp, xem trước văn bản/ảnh và duyệt thư mục</dd></div>
+              <div><dt><code>500 * 12</code> · <code>25 km to mi</code></dt><dd>Tính biểu thức (kể cả <code>0xFF</code>), đổi đơn vị và tỷ giá tiền tệ</dd></div>
+              <div><dt><code>@w</code></dt><dd>Chuyển cửa sổ đang mở, xem CPU%/RAM và tắt bằng <kbd>Alt</kbd> + <kbd>K</kbd></dd></div>
+              <div><dt><code>@c</code></dt><dd>Tìm và sao chép lại lịch sử clipboard</dd></div>
+              <div><dt><code>@sys</code></dt><dd>Khóa màn hình, tạm nghỉ, khởi động lại, tắt máy, đăng xuất</dd></div>
+              <div><dt><code>@theme</code></dt><dd>Đổi nhanh Dark/Light/System hoặc độ trong suốt (vd: <code>@theme 90</code>)</dd></div>
+              <div><dt><code>@</code></dt><dd>Mở danh sách toàn bộ chế độ và script plugin trong <code>plugins/</code></dd></div>
+              <div><dt><code>! ls -la</code></dt><dd>Chạy lệnh shell trong terminal (<kbd>↑</kbd> <kbd>↓</kbd> xem lại lịch sử)</dd></div>
+              <div><dt><code>?</code> hoặc <kbd>F1</kbd></dt><dd>Mở bảng tra cứu phím tắt trực tiếp trong thanh lệnh</dd></div>
+            </dl>
+          </div>
+
+          <div class="usage-panel">
+            <h3>Phím tắt thao tác nhanh</h3>
+            <dl class="commands" aria-label="Danh sách phím tắt">
+              <div><dt><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd></dt><dd>Hiện hoặc ẩn TiaRun từ mọi cửa sổ</dd></div>
+              <div><dt><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd></dt><dd>Chuyển phạm vi Apps ➔ Files ➔ Windows</dd></div>
+              <div><dt><kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>Enter</kbd></dt><dd>Chọn mục, mở, dán hoặc gọi lại lịch sử lệnh <code>!</code></dd></div>
+              <div><dt><kbd>→</kbd> / <kbd>←</kbd> / <kbd>Backspace</kbd></dt><dd>Vào thư mục con hoặc lùi ra thư mục cha</dd></div>
+              <div><dt><kbd>Ctrl</kbd> + <kbd>C</kbd></dt><dd>Sao chép thông minh (tệp, ảnh, kết quả tính, văn bản clipboard)</dd></div>
+              <div><dt><kbd>Alt</kbd> + <kbd>C</kbd><br><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd></dt><dd>Sao chép đường dẫn đầy đủ hoặc giá trị thô</dd></div>
+              <div><dt><kbd>Alt</kbd> + <kbd>T</kbd></dt><dd>Mở thư mục của mục đang chọn trong terminal</dd></div>
+              <div><dt><kbd>Alt</kbd> + <kbd>K</kbd></dt><dd>Tắt (kill) tiến trình đang chọn trong chế độ <code>@w</code></dd></div>
+              <div><dt><kbd>Ctrl</kbd> + <kbd>,</kbd></dt><dd>Mở Cài đặt (giao diện, độ trong suốt, thư mục tìm kiếm)</dd></div>
+              <div><dt><kbd>F1</kbd> / <kbd>Esc</kbd></dt><dd>Mở trợ giúp phím tắt / đóng Cài đặt hoặc ẩn thanh lệnh</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="usage-notes">
+          <article class="usage-note">
+            <h3>Thiết lập phím tắt trên Linux</h3>
+            <p>Trên GNOME, KDE hoặc X11, gán <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> cho lệnh <code>tiarun</code> trong phần phím tắt hệ thống. Trên Sway hoặc Hyprland, TiaRun hỗ trợ cấu hình tự động hoặc thêm <code>exec tiarun --daemon</code> để mở tức thì.</p>
+          </article>
+          <article class="usage-note">
+            <h3>Tùy chỉnh nâng cao &amp; Plugin</h3>
+            <p>Nhấn <kbd>Ctrl</kbd> + <kbd>,</kbd> rồi chọn <strong>Edit config.toml</strong> để chỉnh thư mục index, độ sâu hoặc công cụ tìm web (<code>web_search_url</code>). Đặt script thực thi vào <code>~/.config/tiarun/plugins/</code> để gọi bằng <code>@tên_script</code>.</p>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -239,7 +304,7 @@
       <div class="container">
         <div class="section-heading">
           <h2 id="download-heading">Tải TiaRun</h2>
-          <p>Chọn bộ cài hoặc bản giải nén cho máy tính x86-64.</p>
+          <p>Chọn bộ cài, kho gói hoặc bản giải nén cho máy tính x86-64.</p>
         </div>
 
         <div class="downloads-grid">
@@ -254,16 +319,16 @@
               <div class="package">
                 <div>
                   <h4>Bộ cài Windows</h4>
-                  <p>Chạy bộ cài rồi mở TiaRun từ menu Start.</p>
+                  <p>Cài đặt tự động, tạo shortcut Start Menu và phím tắt <code>Ctrl+Alt+Space</code>.</p>
                 </div>
-                <a class="button secondary" data-package="exe" data-download-label="Tải bộ cài (.exe)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.1.0/tiarun-setup.exe"><span>Tải bộ cài (.exe)</span><small hidden></small></a>
+                <a class="button secondary" data-package="exe" data-download-label="Tải bộ cài (.exe)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.2.0/tiarun-setup.exe"><span>Tải bộ cài (.exe)</span><small hidden></small></a>
               </div>
               <div class="package">
                 <div>
                   <h4>Bản portable</h4>
-                  <p>Giải nén rồi chạy <code>tiarun.exe</code>.</p>
+                  <p>Giải nén rồi chạy trực tiếp <code>tiarun.exe</code>, không cần quyền cài đặt.</p>
                 </div>
-                <a class="text-link" data-package="zip" data-download-label="Tải bản portable (.zip)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.1.0/tiarun-windows-x86_64.zip"><span>Tải bản portable (.zip)</span><small hidden></small></a>
+                <a class="text-link" data-package="zip" data-download-label="Tải bản portable (.zip)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.2.0/tiarun-windows-x86_64.zip"><span>Tải bản portable (.zip)</span><small hidden></small></a>
               </div>
             </div>
           </article>
@@ -279,23 +344,30 @@
               <div class="package">
                 <div>
                   <h4>Debian và Ubuntu</h4>
-                  <p>Mở tệp <code>.deb</code> bằng trình cài đặt phần mềm.</p>
+                  <p>Mở tệp <code>.deb</code> hoặc chạy <code>sudo apt install ./tiarun_*.deb</code> để tự kèm thư viện cần thiết.</p>
                 </div>
-                <a class="button secondary" data-package="deb" data-download-label="Tải gói (.deb)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.1.0/tiarun_1.1.0_amd64.deb"><span>Tải gói (.deb)</span><small hidden></small></a>
+                <a class="button secondary" data-package="deb" data-download-label="Tải gói (.deb)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.2.0/tiarun_1.2.0_amd64.deb"><span>Tải gói (.deb)</span><small hidden></small></a>
               </div>
               <div class="package">
                 <div>
-                  <h4>Bản nén cho Linux</h4>
-                  <p>Giải nén rồi chạy <code>tiarun</code> bên trong.</p>
+                  <h4>Bản nén cho mọi distro (kèm <code>install.sh</code>)</h4>
+                  <p>Giải nén rồi chạy <code>./install.sh</code> để tự cài binary, icon và gói runtime (apt/pacman/dnf/zypper).</p>
                 </div>
-                <a class="text-link" data-package="tar" data-download-label="Tải bản nén (.tar.gz)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.1.0/tiarun-linux-x86_64.tar.gz"><span>Tải bản nén (.tar.gz)</span><small hidden></small></a>
+                <a class="text-link" data-package="tar" data-download-label="Tải bản nén (.tar.gz)" href="https://github.com/hieunx1024/tiarun/releases/download/v1.2.0/tiarun-linux-x86_64.tar.gz"><span>Tải bản nén (.tar.gz)</span><small hidden></small></a>
+              </div>
+              <div class="package">
+                <div>
+                  <h4>Arch Linux (AUR)</h4>
+                  <p>Cài từ AUR kèm sẵn phụ thuộc Wayland/X11: <code>yay -S tiarun-git</code></p>
+                </div>
+                <a class="text-link" href="https://github.com/hieunx1024/tiarun/tree/main/aur">Xem PKGBUILD</a>
               </div>
             </div>
           </article>
         </div>
 
         <div class="release-links">
-          <a class="text-link" id="release-link" href="https://github.com/hieunx1024/tiarun/releases/tag/v1.1.0">Bản phát hành mới nhất <span id="release-version">v1.1.0</span></a>
+          <a class="text-link" id="release-link" href="https://github.com/hieunx1024/tiarun/releases/tag/v1.2.0">Bản phát hành mới nhất <span id="release-version">v1.2.0</span></a>
           <a class="text-link" href="https://github.com/hieunx1024/tiarun/releases">Lịch sử phiên bản</a>
           <a class="text-link" href="https://github.com/hieunx1024/tiarun#build-from-source">Biên dịch từ mã nguồn</a>
         </div>
@@ -310,19 +382,19 @@
         <div class="faq">
           <details>
             <summary>TiaRun tìm kiếm dữ liệu ở đâu?</summary>
-            <p>TiaRun tìm ứng dụng và tệp trên máy. Khi bạn chọn kết quả tìm trên web, truy vấn sẽ mở trong trình duyệt. Tính năng đổi tiền tệ có thể kết nối mạng để cập nhật tỷ giá.</p>
+            <p>TiaRun tìm ứng dụng và tệp trên máy. Khi bạn chọn kết quả tìm trên web, truy vấn sẽ mở trong trình duyệt. Tính năng đổi tiền tệ có thể kết nối mạng để cập nhật tỷ giá nền và dùng dữ liệu lưu đệm khi offline.</p>
           </details>
           <details>
-            <summary>Phím tắt trên Linux chưa hoạt động thì sao?</summary>
-            <p>Mở cài đặt phím tắt của môi trường desktop và gán <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> cho lệnh <code>tiarun</code>. Nếu dùng bản giải nén, nhập đường dẫn đầy đủ đến tệp thực thi.</p>
+            <summary>Phím tắt hoặc chuyển cửa sổ trên Linux cần cài thêm gì không?</summary>
+            <p>Gán <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> cho lệnh <code>tiarun</code> trong cài đặt phím tắt của môi trường desktop. Với <code>@w</code>, tính năng chạy sẵn trên Windows, Sway, Hyprland và mọi X11/XWayland; KDE Wayland cần <code>kdotool</code>, GNOME Wayland cần extension <code>Window Calls</code>, còn clipboard Wayland khuyến nghị cài <code>wl-clipboard</code> (tự cài khi dùng <code>install.sh</code> hoặc <code>.deb</code>).</p>
           </details>
           <details>
             <summary>TiaRun mở lại cửa sổ bằng cách nào?</summary>
-            <p>TiaRun tạo cửa sổ một lần rồi giữ tiến trình chạy nền. Lần gọi tiếp theo gửi tín hiệu đến tiến trình đó để hiện hoặc ẩn cửa sổ.</p>
+            <p>TiaRun tạo cửa sổ một lần rồi giữ tiến trình chạy nền. Lần gọi tiếp theo gửi tín hiệu qua socket đến tiến trình đó để hiện hoặc ẩn cửa sổ tức thì.</p>
           </details>
           <details>
             <summary>Tôi có thể tự chọn thư mục tìm kiếm không?</summary>
-            <p>Dùng <kbd>Ctrl</kbd> + <kbd>,</kbd> để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu và danh sách loại trừ trong <a href="https://github.com/hieunx1024/tiarun#configuration">tệp cấu hình TOML</a>.</p>
+            <p>Dùng <kbd>Ctrl</kbd> + <kbd>,</kbd> để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu, công cụ tìm web và danh sách loại trừ trong <a href="https://github.com/hieunx1024/tiarun#configuration">tệp cấu hình TOML</a>.</p>
           </details>
         </div>
       </div>

@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static HAS_CACHED_SYSTEM_DARK: AtomicBool = AtomicBool::new(false);
+static CACHED_SYSTEM_DARK: AtomicBool = AtomicBool::new(true);
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct GeneralConfig {
@@ -30,11 +34,8 @@ pub struct ThemeConfig {
     pub show_status_bar: Option<bool>,
     #[serde(default = "default_true")]
     pub compact_empty_view: Option<bool>,
-    #[serde(default = "default_view_style")]
-    pub view_style: String,
 }
 
-fn default_view_style() -> String { "liquid_glass".to_string() }
 fn default_theme_mode() -> String { "dark".to_string() }
 fn default_opacity() -> f32 { 0.95 }
 fn default_query_color() -> String { "#dedcd1".to_string() }
@@ -53,9 +54,36 @@ impl ThemeConfig {
             _ => true,
         }
     }
+
+    /// Returns dark-mode state using the cached system theme when `mode == "system"`,
+    /// avoiding synchronous subprocess spawns on hot UI toggle paths.
+    pub fn is_dark_cached(&self) -> bool {
+        match self.mode.to_lowercase().as_str() {
+            "light" => false,
+            "system" => cached_system_dark_mode(),
+            _ => true,
+        }
+    }
+}
+
+/// Returns the most recently observed system dark-mode state without spawning
+/// external processes once initialized by [`is_system_dark_mode`].
+pub fn cached_system_dark_mode() -> bool {
+    if HAS_CACHED_SYSTEM_DARK.load(Ordering::Acquire) {
+        CACHED_SYSTEM_DARK.load(Ordering::Relaxed)
+    } else {
+        is_system_dark_mode()
+    }
 }
 
 pub fn is_system_dark_mode() -> bool {
+    let dark = detect_system_dark_mode();
+    CACHED_SYSTEM_DARK.store(dark, Ordering::Relaxed);
+    HAS_CACHED_SYSTEM_DARK.store(true, Ordering::Release);
+    dark
+}
+
+fn detect_system_dark_mode() -> bool {
     #[cfg(target_os = "windows")]
     {
         use windows_sys::Win32::System::Registry::{
@@ -195,7 +223,6 @@ impl Default for ThemeConfig {
             show_icons: Some(true),
             show_status_bar: Some(false),
             compact_empty_view: Some(true),
-            view_style: default_view_style(),
         }
     }
 }
@@ -318,10 +345,12 @@ impl Config {
         }
     }
 
-    pub fn load() -> Self {
+    /// Loads `config.toml` without probing platform autostart files/directories.
+    /// Suitable for hot UI toggle paths where autostart state is not needed.
+    pub fn load_fast() -> Self {
         let mut config = Self::default();
         let config_path = Self::get_config_path();
-        
+
         if config_path.exists() {
             if let Ok(content) = fs::read_to_string(&config_path) {
                 if let Ok(parsed) = toml::from_str(&content) {
@@ -337,7 +366,12 @@ impl Config {
                 let _ = fs::write(&config_path, toml_str);
             }
         }
-        
+
+        config
+    }
+
+    pub fn load() -> Self {
+        let mut config = Self::load_fast();
         config.general.autostart = is_autostart_enabled();
         config
     }
@@ -370,18 +404,16 @@ pub fn is_autostart_enabled() -> bool {
         // 2. Sway check: check if sway config has exec tiarun --daemon
         if let Some(mut sway_dir) = dirs::config_dir() {
             sway_dir.push("sway");
-            if let Ok(entries) = walkdir::WalkDir::new(&sway_dir).into_iter().collect::<Result<Vec<_>, _>>() {
-                for entry in entries {
-                    if entry.file_type().is_file() {
-                        if let Ok(c) = fs::read_to_string(entry.path()) {
-                            if c.lines().any(|line| {
-                                let l = line.trim();
-                                (l.starts_with("exec ") || l.starts_with("exec_always "))
-                                    && (l.contains("tiarun") || l.contains("view-launcher"))
-                                    && l.contains("--daemon")
-                            }) {
-                                return true;
-                            }
+            for entry in walkdir::WalkDir::new(&sway_dir).max_depth(3).into_iter().flatten() {
+                if entry.file_type().is_file() {
+                    if let Ok(c) = fs::read_to_string(entry.path()) {
+                        if c.lines().any(|line| {
+                            let l = line.trim();
+                            (l.starts_with("exec ") || l.starts_with("exec_always "))
+                                && (l.contains("tiarun") || l.contains("view-launcher"))
+                                && l.contains("--daemon")
+                        }) {
+                            return true;
                         }
                     }
                 }
@@ -748,14 +780,12 @@ pub fn setup_global_shortcut() {
                 sway_dir.push("sway");
                 // Check if already configured anywhere in ~/.config/sway/ (including conf.d/)
                 let mut already_configured = false;
-                if let Ok(entries) = walkdir::WalkDir::new(&sway_dir).into_iter().collect::<Result<Vec<_>, _>>() {
-                    for entry in entries {
-                        if entry.file_type().is_file() {
-                            if let Ok(c) = fs::read_to_string(entry.path()) {
-                                if c.contains("exec tiarun") || c.contains("exec view-launcher") {
-                                    already_configured = true;
-                                    break;
-                                }
+                for entry in walkdir::WalkDir::new(&sway_dir).max_depth(3).into_iter().flatten() {
+                    if entry.file_type().is_file() {
+                        if let Ok(c) = fs::read_to_string(entry.path()) {
+                            if c.contains("exec tiarun") || c.contains("exec view-launcher") {
+                                already_configured = true;
+                                break;
                             }
                         }
                     }

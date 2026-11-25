@@ -17,22 +17,20 @@ fn test_tab_directory_and_scope_navigation() {
     };
 
     let config = Config::default();
-    let _engine = Arc::new(LauncherEngine::with_temporary_index(config));
+    let _engine = Arc::new(LauncherEngine::new(config));
     let icon_resolver = Arc::new(IconResolver::new());
     let current_results: Arc<std::sync::RwLock<Vec<LauncherItem>>> = Arc::new(std::sync::RwLock::new(Vec::new()));
 
     // Verify Scope Icons are properly rasterized and set
     ui.set_scope_apps_icon(icon_resolver.get_scope_apps_icon());
     ui.set_scope_files_icon(icon_resolver.get_scope_files_icon());
-    ui.set_scope_text_icon(icon_resolver.get_scope_text_icon());
     ui.set_scope_windows_icon(icon_resolver.get_scope_windows_icon());
 
     assert!(icon_resolver.get_scope_apps_icon().size().width > 0, "scope_apps_icon must not be empty");
     assert!(icon_resolver.get_scope_files_icon().size().width > 0, "scope_files_icon must not be empty");
-    assert!(icon_resolver.get_scope_text_icon().size().width > 0, "scope_text_icon must not be empty");
     assert!(icon_resolver.get_scope_windows_icon().size().width > 0, "scope_windows_icon must not be empty");
 
-    // Wire Tab Callback with the scope cycling loop (Apps -> Files -> Text -> Windows -> Apps)
+    // Wire Tab Callback with the scope cycling loop (Apps -> Files -> Windows -> Apps)
     {
         let ui_weak = ui.as_weak();
 
@@ -41,8 +39,7 @@ fn test_tab_directory_and_scope_navigation() {
                 let cur = ui.get_active_scope().to_string();
                 let next = match cur.as_str() {
                     "apps" => "files",
-                    "files" => "text",
-                    "text" => "windows",
+                    "files" => "windows",
                     _ => "apps",
                 };
                 ui.set_active_scope(next.into());
@@ -112,17 +109,12 @@ fn test_tab_directory_and_scope_navigation() {
     assert_eq!(ui.get_active_scope().as_str(), "files", "Tab cycles from apps to files");
     assert_eq!(ui.get_search_text().as_str(), "Des", "Query must not be overwritten by top item name");
 
-    // Tab 2: files -> text, query remains "Des"
+    // Tab 2: files -> windows, query remains "Des"
     ui.invoke_tab_pressed();
-    assert_eq!(ui.get_active_scope().as_str(), "text", "Tab cycles from files to text");
+    assert_eq!(ui.get_active_scope().as_str(), "windows", "Tab cycles from files to windows");
     assert_eq!(ui.get_search_text().as_str(), "Des", "Query must not be overwritten by top item name");
 
-    // Tab 3: text -> windows, query remains "Des"
-    ui.invoke_tab_pressed();
-    assert_eq!(ui.get_active_scope().as_str(), "windows", "Tab cycles from text to windows");
-    assert_eq!(ui.get_search_text().as_str(), "Des", "Query must not be overwritten by top item name");
-
-    // Tab 4: windows -> apps loop back, query remains "Des"
+    // Tab 3: windows -> apps loop back, query remains "Des"
     ui.invoke_tab_pressed();
     assert_eq!(ui.get_active_scope().as_str(), "apps", "Tab loops back from windows to apps");
     assert_eq!(ui.get_search_text().as_str(), "Des", "Query must not be overwritten by top item name");
@@ -134,10 +126,7 @@ fn test_tab_directory_and_scope_navigation() {
     assert_eq!(ui.get_active_scope().as_str(), "files", "Tab on empty query cycles from apps to files");
 
     ui.invoke_tab_pressed();
-    assert_eq!(ui.get_active_scope().as_str(), "text", "Tab on empty query cycles from files to text");
-
-    ui.invoke_tab_pressed();
-    assert_eq!(ui.get_active_scope().as_str(), "windows", "Tab on empty query cycles from text to windows");
+    assert_eq!(ui.get_active_scope().as_str(), "windows", "Tab on empty query cycles from files to windows");
 
     ui.invoke_tab_pressed();
     assert_eq!(ui.get_active_scope().as_str(), "apps", "Tab on empty query wraps back to apps");
@@ -162,6 +151,62 @@ fn test_tab_directory_and_scope_navigation() {
     ui.set_search_text("~/Desktop/".into());
     ui.set_active_scope("files".into());
     ui.invoke_tab_pressed();
-    assert_eq!(ui.get_active_scope().as_str(), "text", "Tab switches from files to text");
+    assert_eq!(ui.get_active_scope().as_str(), "windows", "Tab switches from files to windows");
     assert_eq!(ui.get_search_text().as_str(), "", "Directory path must be cleared when switching away from files scope");
+}
+
+#[test]
+fn test_alt_k_triggers_kill_process_in_windows_scope() {
+    let ui_res = std::panic::catch_unwind(|| AppWindow::new());
+    let ui = match ui_res {
+        Ok(Ok(ui)) => ui,
+        _ => {
+            eprintln!("Skipping test (no display available)");
+            return;
+        }
+    };
+
+    let killed_idx = Arc::new(std::sync::Mutex::new(None::<i32>));
+    {
+        let killed_idx = killed_idx.clone();
+        ui.on_kill_process(move |idx| {
+            *killed_idx.lock().unwrap() = Some(idx);
+        });
+    }
+
+    ui.set_active_scope("windows".into());
+    ui.set_search_text("@w".into());
+    ui.set_is_expanded(true);
+    ui.set_selected_index(2);
+    ui.invoke_focus_search();
+
+    // Ctrl+K should no longer trigger kill_process
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyPressed {
+        text: "\u{0011}".into(),
+    });
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyPressed {
+        text: "k".into(),
+    });
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyReleased {
+        text: "k".into(),
+    });
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyReleased {
+        text: "\u{0011}".into(),
+    });
+    assert_eq!(*killed_idx.lock().unwrap(), None, "Ctrl+K must not trigger kill_process");
+
+    // Alt+K triggers kill_process for selected_index
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyPressed {
+        text: "\u{0012}".into(),
+    });
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyPressed {
+        text: "k".into(),
+    });
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyReleased {
+        text: "k".into(),
+    });
+    ui.window().dispatch_event(slint::platform::WindowEvent::KeyReleased {
+        text: "\u{0012}".into(),
+    });
+    assert_eq!(*killed_idx.lock().unwrap(), Some(2), "Alt+K must trigger kill_process in windows scope");
 }

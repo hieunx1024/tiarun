@@ -88,6 +88,26 @@ fn get_image_dimensions(path: &Path, ext: &str) -> Option<(u32, u32)> {
         .ok()
 }
 
+/// Returns `true` for cloud-only placeholders (OneDrive / Dropbox / iCloud "Files On-Demand")
+/// so previewing never triggers an implicit download.
+#[cfg(windows)]
+fn is_cloud_placeholder(path: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_OFFLINE: u32 = 0x0000_1000;
+    const FILE_ATTRIBUTE_RECALL_ON_OPEN: u32 = 0x0004_0000;
+    const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+    std::fs::metadata(path).is_ok_and(|metadata| {
+        metadata.file_attributes()
+            & (FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_OPEN | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
+            != 0
+    })
+}
+
+#[cfg(not(windows))]
+fn is_cloud_placeholder(_path: &Path) -> bool {
+    false
+}
+
 impl FilePreview {
     pub fn from_path(path_str: &str) -> Self {
         let path = Path::new(path_str);
@@ -129,15 +149,21 @@ impl FilePreview {
             })
             .unwrap_or_default();
 
-        // 1. Smart Directory Preview: summarize child files and folders
+        // 1. Smart Directory Preview: summarize child files and folders (capped for huge directories)
         if path.is_dir() {
+            const DIR_SCAN_CAP: usize = 2_000;
             let mut dir_items = Vec::new();
             let mut file_count = 0usize;
             let mut dir_count = 0usize;
+            let mut capped = false;
 
             if let Ok(entries) = fs::read_dir(path) {
                 let mut all_entries = Vec::new();
                 for entry in entries.flatten() {
+                    if file_count + dir_count >= DIR_SCAN_CAP {
+                        capped = true;
+                        break;
+                    }
                     let is_d = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
                     if is_d {
                         dir_count += 1;
@@ -161,11 +187,20 @@ impl FilePreview {
 
                 let total = file_count + dir_count;
                 if total > 12 {
-                    dir_items.push(format!("… and {} more items", total - 12));
+                    if capped {
+                        dir_items.push(format!("… and {}+ more items", total - 12));
+                    } else {
+                        dir_items.push(format!("… and {} more items", total - 12));
+                    }
                 }
             }
 
-            let summary_stat = format!("{} items ({} dirs, {} files)", file_count + dir_count, dir_count, file_count);
+            let total_items = file_count + dir_count;
+            let summary_stat = if capped {
+                format!("{total_items}+ items ({dir_count} dirs, {file_count} files)")
+            } else {
+                format!("{total_items} items ({dir_count} dirs, {file_count} files)")
+            };
             let snippet = if dir_items.is_empty() {
                 "Empty folder".to_string()
             } else {
@@ -190,7 +225,7 @@ impl FilePreview {
         // Cloud-only placeholders (OneDrive "Files On-Demand"...): reading them for a
         // preview would download the file, and the first result is previewed on
         // every keystroke. Show metadata only.
-        if crate::search_index::extractors::DocumentExtractor::is_cloud_placeholder(path) {
+        if is_cloud_placeholder(path) {
             return Self {
                 title,
                 preview_type: "metadata".to_string(),
@@ -263,7 +298,12 @@ impl FilePreview {
             let preview_lang = detect_language(&ext).to_string();
             let text_snippet = if let Ok(mut f) = fs::File::open(path) {
                 use std::io::Read;
-                let mut buf = [0u8; 32768]; // Read up to 32KB for generous, smooth preview
+                let max_bytes = if matches!(ext.as_str(), "json" | "jsonl") {
+                    32768
+                } else {
+                    16384
+                };
+                let mut buf = vec![0u8; max_bytes];
                 if let Ok(n) = f.read(&mut buf) {
                     let raw = String::from_utf8_lossy(&buf[..n]);
                     format_text_snippet(&ext, &raw)
@@ -448,6 +488,21 @@ struct CacheEntry<T> {
     data: T,
     last_access: u64,
     size_bytes: usize,
+    file_len: u64,
+    mtime_secs: i64,
+}
+
+fn path_stamp(path: &Path) -> (u64, i64) {
+    let Ok(meta) = fs::metadata(path) else {
+        return (0, 0);
+    };
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    (meta.len(), mtime)
 }
 
 /// Thread-safe in-memory Bounded LRU cache for preview metadata and decoded thumbnail bytes.
@@ -471,10 +526,13 @@ impl PreviewCache {
 
     pub fn get_or_create_preview(&self, path_str: &str) -> FilePreview {
         let access = self.access_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let (file_len, mtime_secs) = path_stamp(Path::new(path_str));
         if let Ok(mut lock) = self.preview_cache.write() {
             if let Some(entry) = lock.get_mut(path_str) {
-                entry.last_access = access;
-                return entry.data.clone();
+                if entry.file_len == file_len && entry.mtime_secs == mtime_secs {
+                    entry.last_access = access;
+                    return entry.data.clone();
+                }
             }
         }
 
@@ -492,6 +550,8 @@ impl PreviewCache {
                 data: preview.clone(),
                 last_access: access,
                 size_bytes: std::mem::size_of::<FilePreview>() + preview.text_snippet.len(),
+                file_len,
+                mtime_secs,
             });
         }
         preview
@@ -533,6 +593,8 @@ impl PreviewCache {
                 data: (w, h, bytes),
                 last_access: access,
                 size_bytes,
+                file_len: 0,
+                mtime_secs: 0,
             });
         }
     }

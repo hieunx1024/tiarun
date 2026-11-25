@@ -1,8 +1,21 @@
 import { Theme } from "theme.slint";
-import { LiquidGlassLauncher, LauncherItemData } from "launcher.slint";
 import { CategoryChip } from "components/chip.slint";
+import { PreviewPane } from "components/preview_pane.slint";
+import { SettingsView } from "components/settings_view.slint";
 
-export { Theme, LauncherItemData }
+export struct LauncherItemData {
+    name: string,
+    category: string,
+    item_type: string,
+    has_icon: bool,
+    icon: image,
+    exec_or_path: string,
+    subtitle: string,
+    cpu_text: string,
+    ram_text: string,
+}
+
+export { Theme }
 
 export component AppWindow inherits Window {
     forward-focus: window_focus;
@@ -12,15 +25,13 @@ export component AppWindow inherits Window {
     background: transparent;
     width: root.launcher_width;
     height: root.launcher_height;
-    in-out property <bool> cfg_enable_shadow_margin: true;
     in-out property <bool> cfg_fixed_width: false;
-    property <length> shadow_margin: root.cfg_enable_shadow_margin && root.cfg_view_style == "liquid_glass" && !root.in_settings_mode ? Theme.shadow_margin : 0px;
     property <length> content_height: root.in_settings_mode ? Theme.settings_height :
         (root.is_showing_list ? Theme.panel_height : Theme.pill_height);
     property <length> panel_base_width: root.cfg_fixed_width ? Theme.panel_width :
         ((root.is_showing_list && !root.in_settings_mode) ? Theme.panel_width : Theme.pill_width);
-    out property <length> launcher_width: root.panel_base_width + 2 * root.shadow_margin;
-    out property <length> launcher_height: root.cfg_fixed_width ? (Theme.panel_height + root.shadow_margin) : (root.content_height + root.shadow_margin);
+    out property <length> launcher_width: root.panel_base_width;
+    out property <length> launcher_height: root.cfg_fixed_width ? Theme.panel_height : root.content_height;
     out property <length> launcher_radius: root.is_showing_list ? Theme.panel_radius : Theme.pill_radius;
     default-font-family: "Noto Sans";
     default-font-size: 19px;
@@ -39,11 +50,8 @@ export component AppWindow inherits Window {
     in-out property <string> search_text: "";
     in-out property <int> selected_index: 0;
     in-out property <length> scroll_viewport_y: 0px;
-    out property <length> results_height: root.cfg_view_style == "liquid_glass" ?
-        glass_launcher.results_height : list_flickable.height;
-    in-out property <string> active_category: "";
-    in property <bool> categories_enabled: true;
-    in property <[string]> categories: ["Applications", "Development", "Browser", "Media", "Office", "System", "Actions"];
+    out property <length> results_height: list_flickable.height;
+    out property <bool> has_search_selection: search_input.cursor-position-byte-offset != search_input.anchor-position-byte-offset;
     in property <[LauncherItemData]> items: [];
     in property <bool> has_results: true;
     in property <string> mode_title: "APPLICATIONS";
@@ -57,14 +65,12 @@ export component AppWindow inherits Window {
     in-out property <bool> is_expanded: false;
     // Pop-in appear animation: a plain fade in place (no position movement), set by
     // Rust right before/after showing the window. See animate_window_pop_in() in
-    // main.rs. Kept to opacity only (no x/y animation) since animating position
-    // together with the panel's drop-shadow proved to be too heavy for rapid
-    // show/hide cycles and crashed the compositor.
+    // main.rs.
     in-out property <bool> is_pop_visible: false;
     in-out property <bool> is_showing_list: root.in_settings_mode
         || root.search_text != ""
         || root.is_expanded
-        || (!root.cfg_compact_empty && root.cfg_view_style != "liquid_glass");
+        || !root.cfg_compact_empty;
 
     // Action Vector Icons
     in property <image> settings_icon;
@@ -88,14 +94,11 @@ export component AppWindow inherits Window {
     in-out property <int> cfg_max_depth: 2;
     in-out property <string> cfg_theme_mode: "dark";
     in-out property <float> cfg_theme_opacity: 0.95;
-    in-out property <string> cfg_view_style: "liquid_glass";
-    in-out property <bool> has_blur: true;
     in-out property <bool> is_dark: false;
     in-out property <string> settings_status: "";
     in-out property <string> active_scope: "apps";
     in property <image> scope_apps_icon;
     in property <image> scope_files_icon;
-    in property <image> scope_text_icon;
     in property <image> scope_windows_icon;
     in property <string> action_hint_text: "";
     in property <string> action_item_count: "";
@@ -129,16 +132,17 @@ export component AppWindow inherits Window {
 
     callback search_text_changed(string);
     callback file_search_finished();
+    callback window_refresh_finished();
     callback move_up();
     callback move_down();
     callback item_activated(int);
     callback open_in_terminal(int);
     callback copy_path(int);
     callback copy_item(int);
+    callback kill_process(int);
     callback open_config();
     callback close_settings();
-    callback save_settings(bool, bool, bool, int, int, bool, bool, string, float, string);
-    callback chip_selected(string);
+    callback save_settings(bool, bool, bool, int, int, bool, bool, string, float);
     callback scope_selected(string);
     callback open_raw_config();
     callback close_window();
@@ -155,23 +159,15 @@ export component AppWindow inherits Window {
     callback shell_history_reset();
 
     public function focus_search() {
-        if (root.cfg_view_style == "liquid_glass") {
-            glass_launcher.focus_search();
-        } else {
-            search_input.focus();
-        }
+        search_input.focus();
     }
 
     public function move_cursor_to_end() {
-        if (root.cfg_view_style == "liquid_glass") {
-            glass_launcher.focus_search();
-        } else {
-            search_input.set-selection-offsets(999999, 999999);
-        }
+        search_input.set-selection-offsets(999999, 999999);
     }
 
     public function focus_settings() {
-        settings_focus.focus();
+        settings_view.focus_settings();
     }
 
     public function auto_save_settings() {
@@ -184,8 +180,7 @@ export component AppWindow inherits Window {
             root.cfg_autostart,
             root.cfg_compact_empty,
             root.cfg_theme_mode,
-            root.cfg_theme_opacity,
-            root.cfg_view_style
+            root.cfg_theme_opacity
         );
     }
 
@@ -199,24 +194,11 @@ export component AppWindow inherits Window {
 
     init => {
         Theme.dark = root.is_dark;
-        Theme.has_blur = root.has_blur;
-        if (root.cfg_view_style == "liquid_glass") {
-            glass_launcher.focus_search();
-        } else {
-            search_input.focus();
-        }
+        search_input.focus();
     }
 
     changed is_dark => {
         Theme.dark = root.is_dark;
-    }
-
-    changed cfg_theme_opacity => {
-        Theme.surface_opacity = root.cfg_theme_opacity;
-    }
-
-    changed has_blur => {
-        Theme.has_blur = root.has_blur;
     }
 
     window_focus := FocusScope {
@@ -235,110 +217,6 @@ export component AppWindow inherits Window {
             return reject;
         }
 
-        if root.shadow_margin > 0px: Rectangle {
-        x: root.shadow_margin;
-        y: 0px;
-        width: root.panel_base_width;
-        height: root.content_height;
-        border-radius: root.launcher_radius;
-        opacity: root.is_pop_visible ? 1.0 : 0.0;
-        animate opacity { duration: root.is_pop_visible ? 160ms : 0ms; easing: ease-out; }
-        drop-shadow-color: root.is_showing_list ? Theme.shadow_color_panel : Theme.shadow_color_pill;
-        drop-shadow-offset-y: 8px;
-        drop-shadow-blur: 10px;
-    }
-
-    glass_launcher := LiquidGlassLauncher {
-        visible: (root.cfg_view_style == "liquid_glass") && !root.in_settings_mode;
-        x: root.shadow_margin;
-        y: 0px;
-        width: root.panel_base_width;
-        height: root.content_height;
-        active_category <=> root.active_category;
-        categories_enabled: root.categories_enabled;
-        categories: root.categories;
-        search_text <=> root.search_text;
-        selected_index <=> root.selected_index;
-        scroll_viewport_y <=> root.scroll_viewport_y;
-        items: root.items;
-        has_results: root.has_results;
-        search_icon: root.search_icon;
-        settings_icon: root.settings_icon;
-        is_expanded: root.is_showing_list;
-        is_pop_visible: root.is_pop_visible;
-        show_preview: root.show_preview;
-        preview_title: root.preview_title;
-        preview_type: root.preview_type;
-        preview_lang: root.preview_lang;
-        preview_text: root.preview_text;
-        preview_file_size: root.preview_file_size;
-        preview_file_modified: root.preview_file_modified;
-        preview_file_location: root.preview_file_location;
-        preview_image: root.preview_image;
-
-        search_text_changed(txt) => {
-            root.is_expanded = (txt != "");
-            root.search_text_changed(txt);
-        }
-        item_activated(idx) => {
-            root.item_activated(idx);
-        }
-        move_up() => {
-            root.move_up();
-        }
-        move_down() => {
-            root.move_down();
-        }
-        tab_pressed() => {
-            root.tab_pressed();
-        }
-        backtab_pressed() => {
-            root.backtab_pressed();
-        }
-        right_arrow_pressed => {
-            return root.handle_right_arrow();
-        }
-        left_arrow_pressed => {
-            return root.handle_left_arrow();
-        }
-        backspace_pressed => {
-            return root.handle_backspace();
-        }
-        close_launcher() => {
-            root.close_window();
-        }
-        open_settings() => {
-            root.open_config();
-        }
-        start_window_drag() => {
-            root.start_window_drag();
-        }
-        chip_selected(cat) => {
-            root.is_expanded = true;
-            root.chip_selected(cat);
-        }
-        active_scope <=> root.active_scope;
-        scope_apps_icon: root.scope_apps_icon;
-        scope_files_icon: root.scope_files_icon;
-        scope_text_icon: root.scope_text_icon;
-        scope_windows_icon: root.scope_windows_icon;
-        action_hint_text: root.action_hint_text;
-        action_item_count: root.action_item_count;
-        cfg_show_status_bar: root.cfg_show_status_bar;
-        scope_selected(sc) => {
-            root.scope_selected(sc);
-        }
-        f1_pressed => {
-            root.set_search_text_and_search("?");
-        }
-        copy_item(idx) => {
-            root.copy_item(idx);
-        }
-        copy_path(idx) => {
-            root.copy_path(idx);
-        }
-    }
-
     // Transparent click-outside dismiss area when collapsed on fixed-geometry window (GNOME Wayland)
     if (!root.is_showing_list && root.cfg_fixed_width) : TouchArea {
         x: 0px;
@@ -352,19 +230,16 @@ export component AppWindow inherits Window {
 
     // Main Container (Fuzzel Aesthetic)
     main_card := Rectangle {
-        visible: (root.cfg_view_style != "liquid_glass") || root.in_settings_mode;
         x: 0px;
         y: 0px;
         opacity: root.is_pop_visible ? 1.0 : 0.0;
-        animate opacity { duration: root.is_pop_visible ? 160ms : 0ms; easing: ease-out; }
+        animate opacity { duration: root.is_pop_visible ? 110ms : 0ms; easing: ease-out; }
         width: 100%;
         height: root.content_height;
         background: root.col_card_bg;
         border-radius: root.launcher_radius;
-        animate border-radius { duration: Theme.anim_expand; easing: cubic-bezier(0.2, 0.8, 0.2, 1.0); }
         border-width: 1px;
         border-color: root.col_border;
-        animate border-color { duration: 150ms; easing: ease-out; }
         clip: true;
 
         // =========================================================
@@ -551,6 +426,12 @@ export component AppWindow inherits Window {
                                         return accept;
                                     }
                                 }
+                                if (event.modifiers.alt && (event.text == "k" || event.text == "K")) {
+                                    if (root.active_scope == "windows") {
+                                        root.kill_process(root.selected_index);
+                                        return accept;
+                                    }
+                                }
                                 return reject;
                             }
                         }
@@ -578,7 +459,44 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    // 1.5 Settings Button (⚙ Gear icon on the right end)
+                    // 1.5 Help Keycap (F1 / ?) & Settings Button (⚙) on the right end
+                    VerticalLayout {
+                        alignment: center;
+                        help_btn := Rectangle {
+                            width: 26px;
+                            height: 22px;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: (root.search_text == "?" || help_touch.has-hover) ? root.col_prompt : root.col_kbd_border;
+                            background: (root.search_text == "?" || help_touch.has-hover) ? root.col_selection_bg : root.col_kbd_bg;
+                            animate background { duration: 100ms; }
+
+                            help_touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    if (root.search_text == "?") {
+                                        root.set_search_text_and_search("");
+                                    } else {
+                                        root.set_search_text_and_search("?");
+                                    }
+                                    root.focus_search();
+                                    root.move_cursor_to_end();
+                                }
+                            }
+
+                            Text {
+                                width: 100%;
+                                height: 100%;
+                                text: "F1";
+                                color: (root.search_text == "?" || help_touch.has-hover) ? root.col_selection_text : root.col_kbd_text;
+                                font-size: 10px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
                     VerticalLayout {
                         alignment: center;
                         settings_btn := Rectangle {
@@ -589,6 +507,7 @@ export component AppWindow inherits Window {
                             animate background { duration: 100ms; }
 
                             settings_touch := TouchArea {
+                                mouse-cursor: pointer;
                                 clicked => {
                                     root.open_config();
                                 }
@@ -632,13 +551,6 @@ export component AppWindow inherits Window {
                         text: "Files";
                         active: root.active_scope == "files";
                         clicked => { root.scope_selected("files"); }
-                    }
-                    CategoryChip {
-                        icon: root.scope_text_icon;
-                        has_icon: true;
-                        text: "Text";
-                        active: root.active_scope == "text";
-                        clicked => { root.scope_selected("text"); }
                     }
                     CategoryChip {
                         icon: root.scope_windows_icon;
@@ -708,7 +620,6 @@ export component AppWindow inherits Window {
                                 height: 44px;
                                 background: (index == root.selected_index) ? root.col_selection_bg : (item_touch.has-hover ? root.col_item_hover : transparent);
                                 border-radius: 0px;
-                                animate background { duration: 60ms; }
 
                                 item_touch := TouchArea {
                                     clicked => {
@@ -752,7 +663,7 @@ export component AppWindow inherits Window {
                                                 Text {
                                                     width: 100%;
                                                     height: 100%;
-                                                    text: (item.item_type == "calc") ? "=" : ((item.item_type == "dir") ? "/" : ((item.item_type == "clip") ? "≡" : ((item.item_type == "win") ? "□" : ((item.item_type == "sys") ? "⚙" : ((item.item_type == "theme") ? "◐" : ((item.item_type == "shell") ? "❯" : ((item.item_type == "web") ? "↗" : "◆")))))));
+                                                    text: (item.item_type == "calc") ? "=" : ((item.item_type == "dir") ? "/" : ((item.item_type == "clip") ? "≡" : ((item.item_type == "win") ? "□" : ((item.item_type == "sys") ? "⚙" : ((item.item_type == "theme") ? "◐" : ((item.item_type == "shell") ? "❯" : ((item.item_type == "mode") ? "@" : ((item.item_type == "web") ? "↗" : "◆"))))))));
                                                     color: root.col_badge_text;
                                                     font-size: 15px;
                                                     font-weight: 700;
@@ -784,6 +695,55 @@ export component AppWindow inherits Window {
                                             vertical-alignment: center;
                                         }
                                     }
+
+                                    // Process Metrics (CPU% & RAM) in @w Window Switcher
+                                    if (item.cpu_text != "" || item.ram_text != "") : VerticalLayout {
+                                        alignment: center;
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: end;
+
+                                            if (item.cpu_text != "") : Rectangle {
+                                                height: 22px;
+                                                border-radius: 5px;
+                                                background: (index == root.selected_index) ? root.col_card_bg : root.col_badge_bg;
+                                                border-width: 1px;
+                                                border-color: root.col_border;
+                                                HorizontalLayout {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    alignment: center;
+                                                    Text {
+                                                        text: item.cpu_text;
+                                                        color: (index == root.selected_index) ? root.col_selection_text : root.col_text_primary;
+                                                        font-size: 11px;
+                                                        font-weight: 600;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+
+                                            if (item.ram_text != "") : Rectangle {
+                                                height: 22px;
+                                                border-radius: 5px;
+                                                background: (index == root.selected_index) ? root.col_card_bg : root.col_badge_bg;
+                                                border-width: 1px;
+                                                border-color: root.col_border;
+                                                HorizontalLayout {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    alignment: center;
+                                                    Text {
+                                                        text: item.ram_text;
+                                                        color: (index == root.selected_index) ? root.col_selection_text : root.col_text_primary;
+                                                        font-size: 11px;
+                                                        font-weight: 600;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -796,167 +756,20 @@ export component AppWindow inherits Window {
                     }
 
                     // 2.4 Preview Panel (Classic / Fuzzel Theme)
-                    if (root.show_preview && root.has_results) : Rectangle {
-                        width: Theme.preview_pane_width;
-                        background: root.col_card_bg;
-                        clip: true;
-
-                        VerticalLayout {
-                            padding: 14px;
-                            spacing: 8px;
-
-                            // Preview Title
-                            Text {
-                                text: root.preview_title;
-                                font-size: 16px;
-                                font-weight: 700;
-                                color: root.col_text_primary;
-                                overflow: elide;
-                            }
-
-                            if (root.preview_file_location != "") : Text {
-                                text: root.preview_file_location;
-                                font-size: 12px;
-                                color: root.col_text_muted;
-                                overflow: elide;
-                            }
-
-                            Rectangle {
-                                height: 1px;
-                                background: root.col_border;
-                            }
-
-                            // 1. Image Preview
-                            if (root.preview_type == "image") : Rectangle {
-                                vertical-stretch: 1;
-                                background: rgba(0, 0, 0, 0.2);
-                                border-radius: 6px;
-                                border-width: 1px;
-                                border-color: root.col_border;
-                                clip: true;
-                                VerticalLayout {
-                                    alignment: center;
-                                    padding: 8px;
-                                    Image {
-                                        source: root.preview_image;
-                                        max-width: 500px;
-                                        max-height: 380px;
-                                        image-fit: contain;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-
-                            // 2. Text Snippet Preview
-                            if (root.preview_type == "text") : Rectangle {
-                                vertical-stretch: 1;
-                                background: rgba(0, 0, 0, 0.25);
-                                border-radius: 6px;
-                                border-width: 1px;
-                                border-color: root.col_border;
-                                clip: true;
-
-                                VerticalLayout {
-                                    padding: 12px;
-                                    spacing: 8px;
-                                    alignment: start;
-
-                                    if (root.preview_lang != "") : HorizontalLayout {
-                                        alignment: end;
-                                        Rectangle {
-                                            background: rgba(255, 255, 255, 0.1);
-                                            border-radius: 4px;
-                                            HorizontalLayout {
-                                                padding-left: 8px;
-                                                padding-right: 8px;
-                                                padding-top: 3px;
-                                                padding-bottom: 3px;
-                                                Text {
-                                                    text: root.preview_lang;
-                                                    font-family: "monospace";
-                                                    font-size: 11px;
-                                                    font-weight: 700;
-                                                    color: root.col_prompt;
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Flickable {
-                                        vertical-stretch: 1;
-                                        interactive: true;
-                                        viewport-height: classic_preview_layout.preferred-height;
-
-                                        classic_preview_layout := VerticalLayout {
-                                            x: 0px;
-                                            y: 0px;
-                                            width: 100%;
-                                            alignment: start;
-
-                                            Text {
-                                                text: root.preview_text;
-                                                font-family: "monospace";
-                                                font-size: 13.5px;
-                                                color: root.col_text_primary;
-                                                wrap: word-wrap;
-                                                horizontal-alignment: left;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 3. Metadata Preview Card
-                            if (root.preview_type == "metadata") : Rectangle {
-                                vertical-stretch: 1;
-                                background: rgba(0, 0, 0, 0.15);
-                                border-radius: 6px;
-                                border-width: 1px;
-                                border-color: root.col_border;
-
-                                VerticalLayout {
-                                    alignment: center;
-                                    spacing: 12px;
-                                    padding: 20px;
-
-                                    Text {
-                                        text: root.preview_lang != "" ? root.preview_lang : "FILE";
-                                        font-size: 18px;
-                                        font-weight: 700;
-                                        color: root.col_prompt;
-                                        horizontal-alignment: center;
-                                    }
-                                    Text {
-                                        text: root.preview_file_size;
-                                        font-size: 13px;
-                                        color: root.col_text_muted;
-                                        horizontal-alignment: center;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                height: 1px;
-                                background: root.col_border;
-                            }
-
-                            // Bottom info bar
-                            HorizontalLayout {
-                                alignment: space-between;
-                                Text {
-                                    text: root.preview_file_size;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    color: root.col_prompt;
-                                }
-                                Text {
-                                    text: root.preview_file_modified;
-                                    font-size: 12px;
-                                    color: root.col_text_muted;
-                                }
-                            }
-                        }
+                    if (root.show_preview && root.has_results) : PreviewPane {
+                        preview_title: root.preview_title;
+                        preview_type: root.preview_type;
+                        preview_lang: root.preview_lang;
+                        preview_text: root.preview_text;
+                        preview_file_size: root.preview_file_size;
+                        preview_file_modified: root.preview_file_modified;
+                        preview_file_location: root.preview_file_location;
+                        preview_image: root.preview_image;
+                        col_card_bg: root.col_card_bg;
+                        col_border: root.col_border;
+                        col_text_primary: root.col_text_primary;
+                        col_text_muted: root.col_text_muted;
+                        col_prompt: root.col_prompt;
                     }
                 }
             }
@@ -1001,797 +814,38 @@ export component AppWindow inherits Window {
         // =========================================================
         // VIEW 2: SPOTLIGHT PREFERENCES VIEW
         // =========================================================
-        settings_view := Rectangle {
+        settings_view := SettingsView {
             visible: root.in_settings_mode;
             width: 100%;
             height: 100%;
-
-            settings_focus := FocusScope {
-                width: 100%;
-                height: 100%;
-
-                key-pressed(event) => {
-                    if (event.text == Key.Escape || event.text == "\u{001b}") {
-                        root.auto_save_settings();
-                        root.close_settings();
-                        return accept;
-                    }
-                    return reject;
-                }
-
-                VerticalLayout {
-                    padding-left: 20px;
-                    padding-right: 20px;
-                    padding-top: 14px;
-                    padding-bottom: 16px;
-                    spacing: 10px;
-
-                    // 0. Settings Header Bar (26px)
-                    settings_title_bar := Rectangle {
-                        height: 26px;
-
-                        settings_drag_region := TouchArea {
-                            width: 100%;
-                            height: 100%;
-                            pointer-event(event) => {
-                                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
-                                    root.start_window_drag();
-                                }
-                            }
-                        }
-
-                        HorizontalLayout {
-                            alignment: space-between;
-
-                            HorizontalLayout {
-                                spacing: 8px;
-                                alignment: start;
-                                HorizontalLayout {
-                                    alignment: center;
-                                    width: 18px;
-                                    Image {
-                                        source: root.settings_icon;
-                                        colorize: root.col_prompt;
-                                        width: 16px;
-                                        height: 16px;
-                                        image-fit: contain;
-                                        vertical-alignment: center;
-                                        horizontal-alignment: center;
-                                    }
-                                }
-                                Text {
-                                    text: "Spotlight Preferences";
-                                    color: root.col_text_primary;
-                                    font-size: 14px;
-                                    font-weight: 700;
-                                    vertical-alignment: center;
-                                }
-                            }
-
-                            // Back Button [Esc]
-                            back_btn := Rectangle {
-                                height: 26px;
-                                background: back_touch.has-hover ? root.col_btn_secondary_hover : root.col_btn_secondary_bg;
-                                border-radius: 6px;
-                                border-width: 1px;
-                                border-color: root.col_settings_card_border;
-
-                                back_touch := TouchArea {
-                                    clicked => {
-                                        root.auto_save_settings();
-                                        root.close_settings();
-                                    }
-                                }
-
-                                HorizontalLayout {
-                                    padding-left: 12px;
-                                    padding-right: 12px;
-                                    alignment: center;
-                                    Text {
-                                        text: "← Back [Esc]";
-                                        color: root.col_btn_secondary_text;
-                                        font-size: 11px;
-                                        font-weight: 600;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle { height: 1px; background: root.col_separator; }
-
-                    // 1. Settings Scrollable Content Area
-                    Flickable {
-                        vertical-stretch: 1;
-                        viewport-height: 480px;
-
-                        VerticalLayout {
-                            padding-right: 6px;
-                            spacing: 7px;
-
-                            // Group 0: System & Startup
-                            Text {
-                                text: "SYSTEM & STARTUP";
-                                color: root.col_kbd_accent;
-                                font-size: 11px;
-                                font-weight: 700;
-                            }
-
-                            // Setting: Autostart with System
-                            Rectangle {
-                                height: 36px;
-                                background: root.col_settings_card_bg;
-                                border-radius: 8px;
-                                border-width: 1px;
-                                border-color: root.col_settings_card_border;
-                                HorizontalLayout {
-                                    width: 100%;
-                                    height: 100%;
-                                    padding-left: 14px;
-                                    padding-right: 14px;
-                                    alignment: space-between;
-                                    Text {
-                                        text: "Start Automatically on System Boot";
-                                        color: root.col_settings_card_text;
-                                        font-size: 13px;
-                                        font-weight: 500;
-                                        vertical-alignment: center;
-                                    }
-                                    VerticalLayout {
-                                        alignment: center;
-                                        toggle_autostart := Rectangle {
-                                            width: 48px;
-                                            height: 22px;
-                                            border-radius: 11px;
-                                            background: root.cfg_autostart ? #34c759 : #3a3a3c;
-                                            TouchArea {
-                                                clicked => {
-                                                    root.cfg_autostart = !root.cfg_autostart;
-                                                    root.auto_save_settings();
-                                                }
-                                            }
-                                            Text {
-                                                width: 100%;
-                                                height: 100%;
-                                                text: root.cfg_autostart ? "ON" : "OFF";
-                                                color: root.cfg_autostart ? #ffffff : #8e8e93;
-                                                font-size: 10px;
-                                                font-weight: 700;
-                                                vertical-alignment: center;
-                                                horizontal-alignment: center;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                        // Group 1: Appearance & Theme
-                        Text {
-                            text: "APPEARANCE & THEME";
-                            color: root.col_kbd_accent;
-                            font-size: 11px;
-                            font-weight: 700;
-                        }
-
-                        // Setting: Theme Mode (Dark / Light / System)
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Theme Palette";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 176px;
-                                        height: 26px;
-                                        background: root.col_kbd_bg;
-                                        border-radius: 6px;
-                                        border-width: 1px;
-                                        border-color: root.col_settings_card_border;
-                                        HorizontalLayout {
-                                            padding: 2px;
-                                            spacing: 2px;
-
-                                            // Dark
-                                            Rectangle {
-                                                width: 56px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_mode == "dark") ? #007aff : transparent;
-                                                TouchArea {
-                                                    clicked => {
-                                                        root.cfg_theme_mode = "dark";
-                                                        root.is_dark = true;
-                                                        root.auto_save_settings();
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "Dark";
-                                                    color: (root.cfg_theme_mode == "dark") ? #ffffff : root.col_text_muted;
-                                                    font-size: 11px;
-                                                    font-weight: (root.cfg_theme_mode == "dark") ? 700 : 500;
-                                                    vertical-alignment: center;
-                                                    horizontal-alignment: center;
-                                                }
-                                            }
-
-                                            // Light
-                                            Rectangle {
-                                                width: 56px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_mode == "light") ? #007aff : transparent;
-                                                TouchArea {
-                                                    clicked => {
-                                                        root.cfg_theme_mode = "light";
-                                                        root.is_dark = false;
-                                                        root.auto_save_settings();
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "Light";
-                                                    color: (root.cfg_theme_mode == "light") ? #ffffff : root.col_text_muted;
-                                                    font-size: 11px;
-                                                    font-weight: (root.cfg_theme_mode == "light") ? 700 : 500;
-                                                    vertical-alignment: center;
-                                                    horizontal-alignment: center;
-                                                }
-                                            }
-
-                                            // System
-                                            Rectangle {
-                                                width: 56px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_mode == "system") ? #007aff : transparent;
-                                                TouchArea {
-                                                    clicked => {
-                                                        root.cfg_theme_mode = "system";
-                                                        root.request_system_theme();
-                                                        root.auto_save_settings();
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "System";
-                                                    color: (root.cfg_theme_mode == "system") ? #ffffff : root.col_text_muted;
-                                                    font-size: 11px;
-                                                    font-weight: (root.cfg_theme_mode == "system") ? 700 : 500;
-                                                    vertical-alignment: center;
-                                                    horizontal-alignment: center;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Setting: Window Opacity Selector
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Window Opacity (Glassmorphism)";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 222px;
-                                        height: 26px;
-                                        background: root.col_kbd_bg;
-                                        border-radius: 6px;
-                                        border-width: 1px;
-                                        border-color: root.col_settings_card_border;
-                                        HorizontalLayout {
-                                            padding: 2px;
-                                            spacing: 2px;
-
-                                            // 100%
-                                            Rectangle {
-                                                width: 42px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_opacity >= 0.98) ? #007aff : transparent;
-                                                TouchArea { clicked => { root.cfg_theme_opacity = 1.0; root.auto_save_settings(); } }
-                                                Text { text: "100%"; color: (root.cfg_theme_opacity >= 0.98) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.98) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
-                                            }
-
-                                            // 95%
-                                            Rectangle {
-                                                width: 42px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_opacity >= 0.93 && root.cfg_theme_opacity < 0.98) ? #007aff : transparent;
-                                                TouchArea { clicked => { root.cfg_theme_opacity = 0.95; root.auto_save_settings(); } }
-                                                Text { text: "95%"; color: (root.cfg_theme_opacity >= 0.93 && root.cfg_theme_opacity < 0.98) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.93 && root.cfg_theme_opacity < 0.98) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
-                                            }
-
-                                            // 90%
-                                            Rectangle {
-                                                width: 42px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_opacity >= 0.86 && root.cfg_theme_opacity < 0.93) ? #007aff : transparent;
-                                                TouchArea { clicked => { root.cfg_theme_opacity = 0.90; root.auto_save_settings(); } }
-                                                Text { text: "90%"; color: (root.cfg_theme_opacity >= 0.86 && root.cfg_theme_opacity < 0.93) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.86 && root.cfg_theme_opacity < 0.93) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
-                                            }
-
-                                            // 80%
-                                            Rectangle {
-                                                width: 42px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_opacity >= 0.76 && root.cfg_theme_opacity < 0.86) ? #007aff : transparent;
-                                                TouchArea { clicked => { root.cfg_theme_opacity = 0.80; root.auto_save_settings(); } }
-                                                Text { text: "80%"; color: (root.cfg_theme_opacity >= 0.76 && root.cfg_theme_opacity < 0.86) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.76 && root.cfg_theme_opacity < 0.86) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
-                                            }
-
-                                            // 70%
-                                            Rectangle {
-                                                width: 42px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_theme_opacity < 0.76) ? #007aff : transparent;
-                                                TouchArea { clicked => { root.cfg_theme_opacity = 0.70; root.auto_save_settings(); } }
-                                                Text { text: "70%"; color: (root.cfg_theme_opacity < 0.76) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity < 0.76) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Setting: Show App Icons
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Show Native Application Icons";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    toggle_icon := Rectangle {
-                                        width: 48px;
-                                        height: 22px;
-                                        border-radius: 11px;
-                                        background: root.cfg_show_icons ? #34c759 : #3a3a3c;
-                                        TouchArea {
-                                            clicked => {
-                                                root.cfg_show_icons = !root.cfg_show_icons;
-                                                root.auto_save_settings();
-                                            }
-                                        }
-                                        Text {
-                                            width: 100%;
-                                            height: 100%;
-                                            text: root.cfg_show_icons ? "ON" : "OFF";
-                                            color: root.cfg_show_icons ? #ffffff : #8e8e93;
-                                            font-size: 10px;
-                                            font-weight: 700;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: center;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Setting: Compact Start View
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Compact Start View (Spotlight bar)";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    toggle_compact := Rectangle {
-                                        width: 48px;
-                                        height: 22px;
-                                        border-radius: 11px;
-                                        background: root.cfg_compact_empty ? #34c759 : #3a3a3c;
-                                        TouchArea {
-                                            clicked => {
-                                                root.cfg_compact_empty = !root.cfg_compact_empty;
-                                                root.auto_save_settings();
-                                            }
-                                        }
-                                        Text {
-                                            width: 100%;
-                                            height: 100%;
-                                            text: root.cfg_compact_empty ? "ON" : "OFF";
-                                            color: root.cfg_compact_empty ? #ffffff : #8e8e93;
-                                            font-size: 10px;
-                                            font-weight: 700;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: center;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Setting: Show Status Bar
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Show Bottom Keyboard Shortcuts Bar";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    toggle_bar := Rectangle {
-                                        width: 48px;
-                                        height: 22px;
-                                        border-radius: 11px;
-                                        background: root.cfg_show_status_bar ? #34c759 : #3a3a3c;
-                                        TouchArea {
-                                            clicked => {
-                                                root.cfg_show_status_bar = !root.cfg_show_status_bar;
-                                                root.auto_save_settings();
-                                            }
-                                        }
-                                        Text {
-                                            width: 100%;
-                                            height: 100%;
-                                            text: root.cfg_show_status_bar ? "ON" : "OFF";
-                                            color: root.cfg_show_status_bar ? #ffffff : #8e8e93;
-                                            font-size: 10px;
-                                            font-weight: 700;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: center;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Group 2: Search Engine
-                        Text {
-                            text: "SEARCH & ENGINE";
-                            color: root.col_kbd_accent;
-                            font-size: 11px;
-                            font-weight: 700;
-                        }
-
-                        // Setting: Launcher View Style (Liquid Glass Spotlight vs Classic)
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Launcher Style";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 236px;
-                                        height: 26px;
-                                        background: root.col_kbd_bg;
-                                        border-radius: 6px;
-                                        border-width: 1px;
-                                        border-color: root.col_settings_card_border;
-                                        HorizontalLayout {
-                                            padding: 2px;
-                                            spacing: 2px;
-
-                                            // Liquid Glass (Spotlight)
-                                            Rectangle {
-                                                width: 140px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_view_style == "liquid_glass") ? #007aff : transparent;
-                                                TouchArea {
-                                                    clicked => {
-                                                        root.cfg_view_style = "liquid_glass";
-                                                        root.auto_save_settings();
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "Liquid Glass (Spotlight)";
-                                                    color: (root.cfg_view_style == "liquid_glass") ? #ffffff : root.col_text_muted;
-                                                    font-size: 11px;
-                                                    font-weight: (root.cfg_view_style == "liquid_glass") ? 700 : 500;
-                                                    vertical-alignment: center;
-                                                    horizontal-alignment: center;
-                                                }
-                                            }
-
-                                            // Classic
-                                            Rectangle {
-                                                width: 88px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_view_style == "classic") ? #007aff : transparent;
-                                                TouchArea {
-                                                    clicked => {
-                                                        root.cfg_view_style = "classic";
-                                                        root.auto_save_settings();
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "Classic";
-                                                    color: (root.cfg_view_style == "classic") ? #ffffff : root.col_text_muted;
-                                                    font-size: 11px;
-                                                    font-weight: (root.cfg_view_style == "classic") ? 700 : 500;
-                                                    vertical-alignment: center;
-                                                    horizontal-alignment: center;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // Setting: Match Full Path
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Match Full File & Directory Paths";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    toggle_path := Rectangle {
-                                        width: 48px;
-                                        height: 22px;
-                                        border-radius: 11px;
-                                        background: root.cfg_enable_path_matching ? #34c759 : #3a3a3c;
-                                        TouchArea {
-                                            clicked => {
-                                                root.cfg_enable_path_matching = !root.cfg_enable_path_matching;
-                                                root.auto_save_settings();
-                                            }
-                                        }
-                                        Text {
-                                            width: 100%;
-                                            height: 100%;
-                                            text: root.cfg_enable_path_matching ? "ON" : "OFF";
-                                            color: root.cfg_enable_path_matching ? #ffffff : #8e8e93;
-                                            font-size: 10px;
-                                            font-weight: 700;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: center;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Setting: Max Results Selector
-                        Rectangle {
-                            height: 36px;
-                            background: root.col_settings_card_bg;
-                            border-radius: 8px;
-                            border-width: 1px;
-                            border-color: root.col_settings_card_border;
-                            HorizontalLayout {
-                                width: 100%;
-                                height: 100%;
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                alignment: space-between;
-                                Text {
-                                    text: "Max Visible Search Results";
-                                    color: root.col_settings_card_text;
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 104px;
-                                        height: 26px;
-                                        background: root.col_kbd_bg;
-                                        border-radius: 6px;
-                                        border-width: 1px;
-                                        border-color: root.col_settings_card_border;
-                                        HorizontalLayout {
-                                            padding: 2px;
-                                            spacing: 2px;
-
-                                            for num in [5, 7, 9] : Rectangle {
-                                                width: 32px;
-                                                height: 22px;
-                                                border-radius: 4px;
-                                                background: (root.cfg_max_results == num) ? #007aff : transparent;
-                                                TouchArea {
-                                                    clicked => {
-                                                        root.cfg_max_results = num;
-                                                        root.auto_save_settings();
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "\{num}";
-                                                    color: (root.cfg_max_results == num) ? #ffffff : root.col_text_muted;
-                                                    font-size: 11px;
-                                                    font-weight: (root.cfg_max_results == num) ? 700 : 500;
-                                                    vertical-alignment: center;
-                                                    horizontal-alignment: center;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        }
-                    }
-
-                    Rectangle { height: 1px; background: root.col_separator; }
-
-                    // 2. Action Buttons & Status Footer
-                    HorizontalLayout {
-                        height: 30px;
-                        alignment: space-between;
-
-                        // Left: Auto-save status / indicator
-                        HorizontalLayout {
-                            alignment: start;
-                            spacing: 6px;
-                            Text {
-                                text: root.settings_status != "" ? root.settings_status : "✔ Auto-saves all changes";
-                                color: root.settings_status != "" ? #34c759 : root.col_text_muted;
-                                font-size: 11px;
-                                font-weight: 500;
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        // Right: Action buttons
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: end;
-
-                            // Button: Open Raw config.toml
-                            raw_btn := Rectangle {
-                                background: raw_touch.has-hover ? root.col_btn_secondary_hover : root.col_btn_secondary_bg;
-                                border-radius: 6px;
-                                border-width: 1px;
-                                border-color: root.col_settings_card_border;
-
-                                raw_touch := TouchArea {
-                                    clicked => {
-                                        root.open_raw_config();
-                                    }
-                                }
-
-                                HorizontalLayout {
-                                    padding-left: 12px;
-                                    padding-right: 12px;
-                                    alignment: center;
-                                    Text {
-                                        text: "Edit config.toml";
-                                        color: root.col_btn_secondary_text;
-                                        font-size: 11px;
-                                        font-weight: 600;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-
-                            // Button: Done [Esc]
-                            done_btn := Rectangle {
-                                background: done_touch.has-hover ? #0062d2 : #007aff;
-                                border-radius: 6px;
-
-                                done_touch := TouchArea {
-                                    clicked => {
-                                        root.auto_save_settings();
-                                        root.close_settings();
-                                    }
-                                }
-
-                                HorizontalLayout {
-                                    padding-left: 16px;
-                                    padding-right: 16px;
-                                    alignment: center;
-                                    Text {
-                                        text: "Done [Esc]";
-                                        color: #ffffff;
-                                        font-size: 11px;
-                                        font-weight: 700;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            settings_icon: root.settings_icon;
+            is_dark <=> root.is_dark;
+            cfg_autostart <=> root.cfg_autostart;
+            cfg_show_icons <=> root.cfg_show_icons;
+            cfg_show_status_bar <=> root.cfg_show_status_bar;
+            cfg_enable_path_matching <=> root.cfg_enable_path_matching;
+            cfg_compact_empty <=> root.cfg_compact_empty;
+            cfg_max_results <=> root.cfg_max_results;
+            cfg_theme_mode <=> root.cfg_theme_mode;
+            cfg_theme_opacity <=> root.cfg_theme_opacity;
+            settings_status: root.settings_status;
+            col_prompt: root.col_prompt;
+            col_text_primary: root.col_text_primary;
+            col_text_muted: root.col_text_muted;
+            col_btn_secondary_hover: root.col_btn_secondary_hover;
+            col_btn_secondary_bg: root.col_btn_secondary_bg;
+            col_btn_secondary_text: root.col_btn_secondary_text;
+            col_settings_card_bg: root.col_settings_card_bg;
+            col_settings_card_border: root.col_settings_card_border;
+            col_settings_card_text: root.col_settings_card_text;
+            col_separator: root.col_separator;
+            col_kbd_accent: root.col_kbd_accent;
+            col_kbd_bg: root.col_kbd_bg;
+            auto_save_settings => { root.auto_save_settings(); }
+            close_settings => { root.close_settings(); }
+            start_window_drag => { root.start_window_drag(); }
+            request_system_theme => { root.request_system_theme(); }
+            open_raw_config => { root.open_raw_config(); }
         }
     }
     }

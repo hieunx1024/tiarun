@@ -1,0 +1,609 @@
+import { Theme } from "../theme.slint";
+
+component SettingsToggleCard inherits Rectangle {
+    in property <string> label;
+    in-out property <bool> checked;
+    in property <color> card_bg;
+    in property <color> card_border;
+    in property <color> card_text;
+    callback toggled();
+
+    height: 36px;
+    background: root.card_bg;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: root.card_border;
+
+    HorizontalLayout {
+        width: 100%;
+        height: 100%;
+        padding-left: 14px;
+        padding-right: 14px;
+        alignment: space-between;
+
+        Text {
+            text: root.label;
+            color: root.card_text;
+            font-size: 13px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 48px;
+                height: 22px;
+                border-radius: 11px;
+                background: root.checked ? #34c759 : #3a3a3c;
+
+                TouchArea {
+                    clicked => {
+                        root.checked = !root.checked;
+                        root.toggled();
+                    }
+                }
+
+                Text {
+                    width: 100%;
+                    height: 100%;
+                    text: root.checked ? "ON" : "OFF";
+                    color: root.checked ? #ffffff : #8e8e93;
+                    font-size: 10px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+export component SettingsView inherits Rectangle {
+    in property <image> settings_icon;
+    in-out property <bool> is_dark: false;
+    in-out property <bool> cfg_autostart: false;
+    in-out property <bool> cfg_show_icons: true;
+    in-out property <bool> cfg_show_status_bar: true;
+    in-out property <bool> cfg_enable_path_matching: true;
+    in-out property <bool> cfg_compact_empty: true;
+    in-out property <int> cfg_max_results: 7;
+    in-out property <string> cfg_theme_mode: "dark";
+    in-out property <float> cfg_theme_opacity: 0.95;
+    in property <string> settings_status: "";
+
+    // Theme Color Tokens
+    in property <color> col_prompt;
+    in property <color> col_text_primary;
+    in property <color> col_text_muted;
+    in property <color> col_btn_secondary_hover;
+    in property <color> col_btn_secondary_bg;
+    in property <color> col_btn_secondary_text;
+    in property <color> col_settings_card_bg;
+    in property <color> col_settings_card_border;
+    in property <color> col_settings_card_text;
+    in property <color> col_separator;
+    in property <color> col_kbd_accent;
+    in property <color> col_kbd_bg;
+
+    callback auto_save_settings();
+    callback close_settings();
+    callback start_window_drag();
+    callback request_system_theme();
+    callback open_raw_config();
+
+    public function focus_settings() {
+        settings_focus.focus();
+    }
+
+    settings_focus := FocusScope {
+        width: 100%;
+        height: 100%;
+
+        key-pressed(event) => {
+            if (event.text == Key.Escape || event.text == "\u{001b}") {
+                root.auto_save_settings();
+                root.close_settings();
+                return accept;
+            }
+            return reject;
+        }
+
+        VerticalLayout {
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-top: 14px;
+            padding-bottom: 16px;
+            spacing: 10px;
+
+            // 0. Settings Header Bar (26px)
+            settings_title_bar := Rectangle {
+                height: 26px;
+
+                settings_drag_region := TouchArea {
+                    width: 100%;
+                    height: 100%;
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                            root.start_window_drag();
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        HorizontalLayout {
+                            alignment: center;
+                            width: 18px;
+                            Image {
+                                source: root.settings_icon;
+                                colorize: root.col_prompt;
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                            }
+                        }
+                        Text {
+                            text: "Spotlight Preferences";
+                            color: root.col_text_primary;
+                            font-size: 14px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // Back Button [Esc]
+                    back_btn := Rectangle {
+                        height: 26px;
+                        background: back_touch.has-hover ? root.col_btn_secondary_hover : root.col_btn_secondary_bg;
+                        border-radius: 6px;
+                        border-width: 1px;
+                        border-color: root.col_settings_card_border;
+
+                        back_touch := TouchArea {
+                            clicked => {
+                                root.auto_save_settings();
+                                root.close_settings();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text {
+                                text: "← Back [Esc]";
+                                color: root.col_btn_secondary_text;
+                                font-size: 11px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: root.col_separator; }
+
+            // 1. Settings Scrollable Content Area
+            Flickable {
+                vertical-stretch: 1;
+                viewport-height: 435px;
+
+                VerticalLayout {
+                    padding-right: 6px;
+                    spacing: 7px;
+
+                    // Group 0: System & Startup
+                    Text {
+                        text: "SYSTEM & STARTUP";
+                        color: root.col_kbd_accent;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+
+                    SettingsToggleCard {
+                        label: "Start Automatically on System Boot";
+                        checked <=> root.cfg_autostart;
+                        card_bg: root.col_settings_card_bg;
+                        card_border: root.col_settings_card_border;
+                        card_text: root.col_settings_card_text;
+                        toggled => { root.auto_save_settings(); }
+                    }
+
+                    // Group 1: Appearance & Theme
+                    Text {
+                        text: "APPEARANCE & THEME";
+                        color: root.col_kbd_accent;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+
+                    // Setting: Theme Mode (Dark / Light / System)
+                    Rectangle {
+                        height: 36px;
+                        background: root.col_settings_card_bg;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: root.col_settings_card_border;
+                        HorizontalLayout {
+                            width: 100%;
+                            height: 100%;
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            alignment: space-between;
+                            Text {
+                                text: "Theme Palette";
+                                color: root.col_settings_card_text;
+                                font-size: 13px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 176px;
+                                    height: 26px;
+                                    background: root.col_kbd_bg;
+                                    border-radius: 6px;
+                                    border-width: 1px;
+                                    border-color: root.col_settings_card_border;
+                                    HorizontalLayout {
+                                        padding: 2px;
+                                        spacing: 2px;
+
+                                        // Dark
+                                        Rectangle {
+                                            width: 56px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_mode == "dark") ? #007aff : transparent;
+                                            TouchArea {
+                                                clicked => {
+                                                    root.cfg_theme_mode = "dark";
+                                                    root.is_dark = true;
+                                                    root.auto_save_settings();
+                                                }
+                                            }
+                                            Text {
+                                                text: "Dark";
+                                                color: (root.cfg_theme_mode == "dark") ? #ffffff : root.col_text_muted;
+                                                font-size: 11px;
+                                                font-weight: (root.cfg_theme_mode == "dark") ? 700 : 500;
+                                                vertical-alignment: center;
+                                                horizontal-alignment: center;
+                                            }
+                                        }
+
+                                        // Light
+                                        Rectangle {
+                                            width: 56px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_mode == "light") ? #007aff : transparent;
+                                            TouchArea {
+                                                clicked => {
+                                                    root.cfg_theme_mode = "light";
+                                                    root.is_dark = false;
+                                                    root.auto_save_settings();
+                                                }
+                                            }
+                                            Text {
+                                                text: "Light";
+                                                color: (root.cfg_theme_mode == "light") ? #ffffff : root.col_text_muted;
+                                                font-size: 11px;
+                                                font-weight: (root.cfg_theme_mode == "light") ? 700 : 500;
+                                                vertical-alignment: center;
+                                                horizontal-alignment: center;
+                                            }
+                                        }
+
+                                        // System
+                                        Rectangle {
+                                            width: 56px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_mode == "system") ? #007aff : transparent;
+                                            TouchArea {
+                                                clicked => {
+                                                    root.cfg_theme_mode = "system";
+                                                    root.request_system_theme();
+                                                    root.auto_save_settings();
+                                                }
+                                            }
+                                            Text {
+                                                text: "System";
+                                                color: (root.cfg_theme_mode == "system") ? #ffffff : root.col_text_muted;
+                                                font-size: 11px;
+                                                font-weight: (root.cfg_theme_mode == "system") ? 700 : 500;
+                                                vertical-alignment: center;
+                                                horizontal-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Setting: Window Opacity Selector
+                    Rectangle {
+                        height: 36px;
+                        background: root.col_settings_card_bg;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: root.col_settings_card_border;
+                        HorizontalLayout {
+                            width: 100%;
+                            height: 100%;
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            alignment: space-between;
+                            Text {
+                                text: "Window Opacity";
+                                color: root.col_settings_card_text;
+                                font-size: 13px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 222px;
+                                    height: 26px;
+                                    background: root.col_kbd_bg;
+                                    border-radius: 6px;
+                                    border-width: 1px;
+                                    border-color: root.col_settings_card_border;
+                                    HorizontalLayout {
+                                        padding: 2px;
+                                        spacing: 2px;
+
+                                        // 100%
+                                        Rectangle {
+                                            width: 42px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_opacity >= 0.98) ? #007aff : transparent;
+                                            TouchArea { clicked => { root.cfg_theme_opacity = 1.0; root.auto_save_settings(); } }
+                                            Text { text: "100%"; color: (root.cfg_theme_opacity >= 0.98) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.98) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
+                                        }
+
+                                        // 95%
+                                        Rectangle {
+                                            width: 42px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_opacity >= 0.93 && root.cfg_theme_opacity < 0.98) ? #007aff : transparent;
+                                            TouchArea { clicked => { root.cfg_theme_opacity = 0.95; root.auto_save_settings(); } }
+                                            Text { text: "95%"; color: (root.cfg_theme_opacity >= 0.93 && root.cfg_theme_opacity < 0.98) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.93 && root.cfg_theme_opacity < 0.98) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
+                                        }
+
+                                        // 90%
+                                        Rectangle {
+                                            width: 42px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_opacity >= 0.86 && root.cfg_theme_opacity < 0.93) ? #007aff : transparent;
+                                            TouchArea { clicked => { root.cfg_theme_opacity = 0.90; root.auto_save_settings(); } }
+                                            Text { text: "90%"; color: (root.cfg_theme_opacity >= 0.86 && root.cfg_theme_opacity < 0.93) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.86 && root.cfg_theme_opacity < 0.93) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
+                                        }
+
+                                        // 80%
+                                        Rectangle {
+                                            width: 42px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_opacity >= 0.76 && root.cfg_theme_opacity < 0.86) ? #007aff : transparent;
+                                            TouchArea { clicked => { root.cfg_theme_opacity = 0.80; root.auto_save_settings(); } }
+                                            Text { text: "80%"; color: (root.cfg_theme_opacity >= 0.76 && root.cfg_theme_opacity < 0.86) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity >= 0.76 && root.cfg_theme_opacity < 0.86) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
+                                        }
+
+                                        // 70%
+                                        Rectangle {
+                                            width: 42px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_theme_opacity < 0.76) ? #007aff : transparent;
+                                            TouchArea { clicked => { root.cfg_theme_opacity = 0.70; root.auto_save_settings(); } }
+                                            Text { text: "70%"; color: (root.cfg_theme_opacity < 0.76) ? #ffffff : root.col_text_muted; font-size: 11px; font-weight: (root.cfg_theme_opacity < 0.76) ? 700 : 500; vertical-alignment: center; horizontal-alignment: center; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsToggleCard {
+                        label: "Show Native Application Icons";
+                        checked <=> root.cfg_show_icons;
+                        card_bg: root.col_settings_card_bg;
+                        card_border: root.col_settings_card_border;
+                        card_text: root.col_settings_card_text;
+                        toggled => { root.auto_save_settings(); }
+                    }
+
+                    SettingsToggleCard {
+                        label: "Compact Start View (Spotlight bar)";
+                        checked <=> root.cfg_compact_empty;
+                        card_bg: root.col_settings_card_bg;
+                        card_border: root.col_settings_card_border;
+                        card_text: root.col_settings_card_text;
+                        toggled => { root.auto_save_settings(); }
+                    }
+
+                    SettingsToggleCard {
+                        label: "Show Bottom Keyboard Shortcuts Bar";
+                        checked <=> root.cfg_show_status_bar;
+                        card_bg: root.col_settings_card_bg;
+                        card_border: root.col_settings_card_border;
+                        card_text: root.col_settings_card_text;
+                        toggled => { root.auto_save_settings(); }
+                    }
+
+                    // Group 2: Search Engine
+                    Text {
+                        text: "SEARCH & ENGINE";
+                        color: root.col_kbd_accent;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+
+                    SettingsToggleCard {
+                        label: "Match Full File & Directory Paths";
+                        checked <=> root.cfg_enable_path_matching;
+                        card_bg: root.col_settings_card_bg;
+                        card_border: root.col_settings_card_border;
+                        card_text: root.col_settings_card_text;
+                        toggled => { root.auto_save_settings(); }
+                    }
+
+                    // Setting: Max Results Selector
+                    Rectangle {
+                        height: 36px;
+                        background: root.col_settings_card_bg;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: root.col_settings_card_border;
+                        HorizontalLayout {
+                            width: 100%;
+                            height: 100%;
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            alignment: space-between;
+                            Text {
+                                text: "Max Visible Search Results";
+                                color: root.col_settings_card_text;
+                                font-size: 13px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 104px;
+                                    height: 26px;
+                                    background: root.col_kbd_bg;
+                                    border-radius: 6px;
+                                    border-width: 1px;
+                                    border-color: root.col_settings_card_border;
+                                    HorizontalLayout {
+                                        padding: 2px;
+                                        spacing: 2px;
+
+                                        for num in [5, 7, 9] : Rectangle {
+                                            width: 32px;
+                                            height: 22px;
+                                            border-radius: 4px;
+                                            background: (root.cfg_max_results == num) ? #007aff : transparent;
+                                            TouchArea {
+                                                clicked => {
+                                                    root.cfg_max_results = num;
+                                                    root.auto_save_settings();
+                                                }
+                                            }
+                                            Text {
+                                                text: "\{num}";
+                                                color: (root.cfg_max_results == num) ? #ffffff : root.col_text_muted;
+                                                font-size: 11px;
+                                                font-weight: (root.cfg_max_results == num) ? 700 : 500;
+                                                vertical-alignment: center;
+                                                horizontal-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: root.col_separator; }
+
+            // 2. Action Buttons & Status Footer
+            HorizontalLayout {
+                height: 30px;
+                alignment: space-between;
+
+                // Left: Auto-save status / indicator
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 6px;
+                    Text {
+                        text: root.settings_status != "" ? root.settings_status : "✔ Auto-saves all changes";
+                        color: root.settings_status != "" ? #34c759 : root.col_text_muted;
+                        font-size: 11px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Right: Action buttons
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    // Button: Open Raw config.toml
+                    raw_btn := Rectangle {
+                        background: raw_touch.has-hover ? root.col_btn_secondary_hover : root.col_btn_secondary_bg;
+                        border-radius: 6px;
+                        border-width: 1px;
+                        border-color: root.col_settings_card_border;
+
+                        raw_touch := TouchArea {
+                            clicked => {
+                                root.open_raw_config();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text {
+                                text: "Edit config.toml";
+                                color: root.col_btn_secondary_text;
+                                font-size: 11px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Button: Done [Esc]
+                    done_btn := Rectangle {
+                        background: done_touch.has-hover ? #0062d2 : #007aff;
+                        border-radius: 6px;
+
+                        done_touch := TouchArea {
+                            clicked => {
+                                root.auto_save_settings();
+                                root.close_settings();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            alignment: center;
+                            Text {
+                                text: "Done [Esc]";
+                                color: #ffffff;
+                                font-size: 11px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

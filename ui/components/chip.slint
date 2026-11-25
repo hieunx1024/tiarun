@@ -9,16 +9,13 @@ export component CategoryChip inherits Rectangle {
     callback clicked();
 
     height: Theme.chip_height;
-    width: (root.has_icon ? 19px : 0px) + chip_txt.preferred-width + (root.shortcut != "" ? 12px : 0px) + 2 * Theme.chip_padding_x + 2px;
+    width: chip_layout.preferred-width;
     border-radius: Theme.chip_radius;
     border-width: 0.5px;
     border-color: root.active ? (Theme.dark ? rgba(64, 156, 255, 0.45) : rgba(10, 99, 209, 0.35)) : Theme.chip_border;
     background: root.active ? (Theme.dark ? rgba(10, 132, 255, 0.28) : rgba(10, 132, 255, 0.18)) : (touch.has-hover ? Theme.chip_fill_hover : Theme.chip_fill);
-    animate background { duration: 120ms; easing: ease-out; }
-    animate border-color { duration: 120ms; easing: ease-out; }
 
-    HorizontalLayout {
-        width: 100%;
+    chip_layout := HorizontalLayout {
         height: 100%;
         padding-left: Theme.chip_padding_x;
         padding-right: Theme.chip_padding_x;
@@ -47,6 +44,20 @@ export component CategoryChip inherits Rectangle {
                 font-size: 11.5px;
                 font-weight: root.active ? 600 : 500;
                 color: root.active ? Theme.chip_active_text : Theme.chip_text;
+                vertical-alignment: center;
+            }
+        }
+
+        if (root.shortcut != "") : VerticalLayout {
+            alignment: center;
+
+            Text {
+                text: root.shortcut;
+                font-family: Theme.font_family;
+                font-size: 10.5px;
+                font-weight: 500;
+                color: root.active ? Theme.chip_active_text : Theme.chip_text;
+                opacity: root.active ? 0.8 : 0.55;
                 vertical-alignment: center;
             }
         }

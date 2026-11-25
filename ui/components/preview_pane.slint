@@ -1,0 +1,179 @@
+import { Theme } from "../theme.slint";
+
+export component PreviewPane inherits Rectangle {
+    in property <string> preview_title: "";
+    in property <string> preview_type: "none"; // "image" | "text" | "metadata"
+    in property <string> preview_lang: "";
+    in property <string> preview_text: "";
+    in property <string> preview_file_size: "";
+    in property <string> preview_file_modified: "";
+    in property <string> preview_file_location: "";
+    in property <image> preview_image;
+
+    in property <color> col_card_bg;
+    in property <color> col_border;
+    in property <color> col_text_primary;
+    in property <color> col_text_muted;
+    in property <color> col_prompt;
+
+    width: Theme.preview_pane_width;
+    background: root.col_card_bg;
+    clip: true;
+
+    VerticalLayout {
+        padding: 14px;
+        spacing: 8px;
+
+        // Preview Title
+        Text {
+            text: root.preview_title;
+            font-size: 16px;
+            font-weight: 700;
+            color: root.col_text_primary;
+            overflow: elide;
+        }
+
+        if (root.preview_file_location != "") : Text {
+            text: root.preview_file_location;
+            font-size: 12px;
+            color: root.col_text_muted;
+            overflow: elide;
+        }
+
+        Rectangle {
+            height: 1px;
+            background: root.col_border;
+        }
+
+        // 1. Image Preview
+        if (root.preview_type == "image") : Rectangle {
+            vertical-stretch: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: root.col_border;
+            clip: true;
+            VerticalLayout {
+                alignment: center;
+                padding: 8px;
+                Image {
+                    source: root.preview_image;
+                    max-width: 500px;
+                    max-height: 380px;
+                    image-fit: contain;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 2. Text Snippet Preview
+        if (root.preview_type == "text") : Rectangle {
+            vertical-stretch: 1;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: root.col_border;
+            clip: true;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                alignment: start;
+
+                if (root.preview_lang != "") : HorizontalLayout {
+                    alignment: end;
+                    Rectangle {
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 4px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            padding-top: 3px;
+                            padding-bottom: 3px;
+                            Text {
+                                text: root.preview_lang;
+                                font-family: "monospace";
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: root.col_prompt;
+                            }
+                        }
+                    }
+                }
+
+                Flickable {
+                    vertical-stretch: 1;
+                    interactive: true;
+                    viewport-height: classic_preview_layout.preferred-height;
+
+                    classic_preview_layout := VerticalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: 100%;
+                        alignment: start;
+
+                        Text {
+                            text: root.preview_text;
+                            font-family: "monospace";
+                            font-size: 13.5px;
+                            color: root.col_text_primary;
+                            wrap: word-wrap;
+                            horizontal-alignment: left;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Metadata Preview Card
+        if (root.preview_type == "metadata") : Rectangle {
+            vertical-stretch: 1;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: root.col_border;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+                padding: 20px;
+
+                Text {
+                    text: root.preview_lang != "" ? root.preview_lang : "FILE";
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: root.col_prompt;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: root.preview_file_size;
+                    font-size: 13px;
+                    color: root.col_text_muted;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: root.col_border;
+        }
+
+        // Bottom info bar
+        HorizontalLayout {
+            alignment: space-between;
+            Text {
+                text: root.preview_file_size;
+                font-size: 12px;
+                font-weight: 600;
+                color: root.col_prompt;
+            }
+            Text {
+                text: root.preview_file_modified;
+                font-size: 12px;
+                color: root.col_text_muted;
+            }
+        }
+    }
+}
