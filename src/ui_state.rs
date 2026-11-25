@@ -531,10 +531,10 @@ pub(crate) fn update_preview_for_item(
             {
                 let resolver = IconResolver::new();
                 let folder_icon = resolver
-                    .resolve_icon(None, "", "dir")
+                    .resolve_file_type_icon(std::path::Path::new(&path), launcher::ItemType::Dir)
                     .unwrap_or_default();
                 let file_icon = resolver
-                    .resolve_icon(None, "", "file")
+                    .resolve_file_type_icon(std::path::Path::new("file.txt"), launcher::ItemType::File)
                     .unwrap_or_default();
                 preview
                     .text_snippet
