@@ -526,6 +526,45 @@ pub(crate) fn update_preview_for_item(
                 pixels.make_mut_bytes().copy_from_slice(&bytes);
                 slint::Image::from_rgba8(pixels)
             }).unwrap_or_default();
+            let dir_items: Vec<tiarun::PreviewDirItem> = if preview.preview_lang == "DIRECTORY"
+                && preview.text_snippet != "Empty folder"
+            {
+                let resolver = IconResolver::new();
+                let folder_icon = resolver
+                    .resolve_icon(None, "", "dir")
+                    .unwrap_or_default();
+                let file_icon = resolver
+                    .resolve_icon(None, "", "file")
+                    .unwrap_or_default();
+                preview
+                    .text_snippet
+                    .lines()
+                    .map(|line| {
+                        if let Some(name) = line.strip_prefix("📁 ") {
+                            tiarun::PreviewDirItem {
+                                name: name.into(),
+                                icon: folder_icon.clone(),
+                                has_icon: true,
+                            }
+                        } else if let Some(name) = line.strip_prefix("📄 ") {
+                            tiarun::PreviewDirItem {
+                                name: name.into(),
+                                icon: file_icon.clone(),
+                                has_icon: true,
+                            }
+                        } else {
+                            tiarun::PreviewDirItem {
+                                name: line.into(),
+                                icon: slint::Image::default(),
+                                has_icon: false,
+                            }
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            ui.set_preview_dir_items(std::rc::Rc::new(slint::VecModel::from(dir_items)).into());
             ui.set_preview_title(preview.title.into());
             ui.set_preview_type(preview.preview_type.as_str().into());
             ui.set_preview_lang(preview.preview_lang.into());

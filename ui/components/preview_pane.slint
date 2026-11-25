@@ -1,10 +1,17 @@
 import { Theme } from "../theme.slint";
 
+export struct PreviewDirItem {
+    name: string,
+    icon: image,
+    has_icon: bool,
+}
+
 export component PreviewPane inherits Rectangle {
     in property <string> preview_title: "";
     in property <string> preview_type: "none"; // "image" | "text" | "metadata"
     in property <string> preview_lang: "";
     in property <string> preview_text: "";
+    in property <[PreviewDirItem]> preview_dir_items: [];
     in property <string> preview_file_size: "";
     in property <string> preview_file_modified: "";
     in property <string> preview_file_location: "";
@@ -112,8 +119,34 @@ export component PreviewPane inherits Rectangle {
                         y: 0px;
                         width: 100%;
                         alignment: start;
+                        spacing: 4px;
 
-                        Text {
+                        if (root.preview_dir_items.length > 0) : VerticalLayout {
+                            spacing: 4px;
+                            for entry in root.preview_dir_items : HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                height: 20px;
+
+                                if (entry.has_icon) : Image {
+                                    source: entry.icon;
+                                    width: 16px;
+                                    height: 16px;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: entry.name;
+                                    font-family: "monospace";
+                                    font-size: 13px;
+                                    color: entry.has_icon ? root.col_text_primary : root.col_text_muted;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+
+                        if (root.preview_dir_items.length == 0) : Text {
                             text: root.preview_text;
                             font-family: "monospace";
                             font-size: 13.5px;

@@ -588,8 +588,18 @@ impl LauncherEngine {
                 }
             }
         }
-        dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        dirs.sort_by(|a, b| {
+            a.name
+                .starts_with('.')
+                .cmp(&b.name.starts_with('.'))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        });
+        files.sort_by(|a, b| {
+            a.name
+                .starts_with('.')
+                .cmp(&b.name.starts_with('.'))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        });
         dirs.extend(files);
         dirs
     }

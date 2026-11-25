@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import { CategoryChip } from "components/chip.slint";
-import { PreviewPane } from "components/preview_pane.slint";
+import { PreviewPane, PreviewDirItem } from "components/preview_pane.slint";
 import { SettingsView } from "components/settings_view.slint";
 
 export struct LauncherItemData {
@@ -42,6 +42,7 @@ export component AppWindow inherits Window {
     in property <string> preview_type: "none"; // "image" | "text" | "metadata"
     in property <string> preview_lang: "";
     in property <string> preview_text: "";
+    in property <[PreviewDirItem]> preview_dir_items: [];
     in property <string> preview_file_size: "";
     in property <string> preview_file_modified: "";
     in property <string> preview_file_location: "";
@@ -761,6 +762,7 @@ export component AppWindow inherits Window {
                         preview_type: root.preview_type;
                         preview_lang: root.preview_lang;
                         preview_text: root.preview_text;
+                        preview_dir_items: root.preview_dir_items;
                         preview_file_size: root.preview_file_size;
                         preview_file_modified: root.preview_file_modified;
                         preview_file_location: root.preview_file_location;
