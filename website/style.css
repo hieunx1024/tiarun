@@ -159,6 +159,15 @@ kbd {
   cursor: pointer;
 }
 
+.lang-switch {
+  padding-inline: 0.6rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.lang-switch:hover { color: var(--text); }
+
 .button { padding: 0.65rem 1.05rem; }
 .icon-button:hover, .button:hover { background: var(--raised); border-color: var(--accent); }
 .theme-moon, [data-theme="light"] .theme-sun { display: none; }

@@ -5,12 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TiaRun — Launcher miễn phí cho Windows và Linux</title>
   <meta name="description" content="Mở ứng dụng, tìm tệp tiếng Việt không dấu và tính nhanh ngay từ bàn phím. Tải TiaRun miễn phí cho Windows và Linux.">
+  <meta name="robots" content="index, follow">
+  <meta name="google-site-verification" content="nR0mHN6mKN1225xLVlb11ufB7Uo2OpVMz7DL-xVXub4">
   <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
   <link rel="canonical" href="https://tiarun.vercel.app/">
+  <link rel="alternate" hreflang="vi" href="https://tiarun.vercel.app/">
+  <link rel="alternate" hreflang="en" href="https://tiarun.vercel.app/en">
+  <link rel="alternate" hreflang="x-default" href="https://tiarun.vercel.app/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="TiaRun">
   <meta property="og:locale" content="vi_VN">
+  <meta property="og:locale:alternate" content="en_US">
   <meta property="og:url" content="https://tiarun.vercel.app/">
   <meta property="og:title" content="TiaRun — Mở ứng dụng và tìm tệp bằng bàn phím">
   <meta property="og:description" content="Mở ứng dụng, tìm tệp tiếng Việt không dấu và tính nhanh từ một thanh lệnh. Miễn phí cho Windows và Linux.">
@@ -23,21 +29,70 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5">
-  <script src="app.js?v=2" defer></script>
+  <link rel="stylesheet" href="style.css?v=6">
+  <script src="app.js?v=3" defer></script>
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "TiaRun",
-      "url": "https://tiarun.vercel.app/",
-      "description": "Launcher điều khiển bằng bàn phím, hỗ trợ tìm kiếm tiếng Việt không dấu.",
-      "operatingSystem": ["Windows", "Linux"],
-      "applicationCategory": "UtilitiesApplication",
-      "isAccessibleForFree": true,
-      "offers": { "@type": "Offer", "price": 0, "priceCurrency": "USD" },
-      "installUrl": "https://github.com/hieunx1024/tiarun/releases/latest",
-      "screenshot": "https://tiarun.vercel.app/assets/launcher-home.png"
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "TiaRun",
+          "url": "https://tiarun.vercel.app/",
+          "description": "Launcher điều khiển bằng bàn phím, hỗ trợ tìm kiếm tiếng Việt không dấu.",
+          "operatingSystem": ["Windows", "Linux"],
+          "applicationCategory": "UtilitiesApplication",
+          "softwareVersion": "1.0.0",
+          "isAccessibleForFree": true,
+          "license": "https://opensource.org/licenses/MIT",
+          "offers": { "@type": "Offer", "price": 0, "priceCurrency": "USD" },
+          "author": {
+            "@type": "Person",
+            "name": "Nguyen Xuan Hieu",
+            "url": "https://github.com/hieunx1024"
+          },
+          "installUrl": "https://github.com/hieunx1024/tiarun/releases/latest",
+          "downloadUrl": "https://github.com/hieunx1024/tiarun/releases/latest",
+          "screenshot": "https://tiarun.vercel.app/assets/launcher-home.png"
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "TiaRun tìm kiếm dữ liệu ở đâu?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TiaRun tìm ứng dụng và tệp trên máy. Khi bạn chọn kết quả tìm trên web, truy vấn sẽ mở trong trình duyệt. Tính năng đổi tiền tệ có thể kết nối mạng để cập nhật tỷ giá."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Phím tắt trên Linux chưa hoạt động thì sao?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Mở cài đặt phím tắt của môi trường desktop và gán Ctrl + Alt + Space cho lệnh tiarun. Nếu dùng bản giải nén, nhập đường dẫn đầy đủ đến tệp thực thi."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "TiaRun mở lại cửa sổ bằng cách nào?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TiaRun tạo cửa sổ một lần rồi giữ tiến trình chạy nền. Lần gọi tiếp theo gửi tín hiệu đến tiến trình đó để hiện hoặc ẩn cửa sổ."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Tôi có thể tự chọn thư mục tìm kiếm không?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Dùng Ctrl + , để mở cài đặt. Bạn cũng có thể đặt thư mục, độ sâu và danh sách loại trừ trong tệp cấu hình TOML."
+              }
+            }
+          ]
+        }
+      ]
     }
   </script>
 </head>
@@ -55,6 +110,7 @@
         <a href="https://github.com/hieunx1024/tiarun">GitHub</a>
       </nav>
       <div class="header-actions">
+        <a class="icon-button lang-switch" href="/en" hreflang="en" lang="en" aria-label="Switch language to English" title="English">EN</a>
         <button type="button" class="icon-button theme-toggle" id="theme-toggle" hidden>
           <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
             <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>

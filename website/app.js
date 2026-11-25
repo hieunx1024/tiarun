@@ -3,6 +3,8 @@
 const REPO_URL = 'https://github.com/hieunx1024/tiarun';
 const SITE_THEME_KEY = 'tiarun-site-theme';
 const GALLERY_THEME_KEY = 'tiarun-gallery-theme';
+const IS_EN = document.documentElement.lang.toLowerCase().startsWith('en');
+const ASSET_PREFIX = document.documentElement.dataset.assetPrefix || 'assets/';
 
 function readTheme(key) {
   try {
@@ -30,7 +32,9 @@ function initThemes() {
 
   function applyTheme(theme) {
     root.dataset.theme = theme;
-    const label = theme === 'dark' ? 'Chuyển trang sang giao diện sáng' : 'Chuyển trang sang giao diện tối';
+    const label = IS_EN
+      ? (theme === 'dark' ? 'Switch page to light theme' : 'Switch page to dark theme')
+      : (theme === 'dark' ? 'Chuyển trang sang giao diện sáng' : 'Chuyển trang sang giao diện tối');
     toggle.setAttribute('aria-label', label);
     toggle.title = label;
   }
@@ -71,7 +75,7 @@ function initGallery() {
     const panel = panels[activeIndex];
     const key = panel.id.slice('panel-'.length);
     const image = panel.querySelector('img');
-    const source = `assets/demo-${key}-${theme}.webp`;
+    const source = `${ASSET_PREFIX}demo-${key}-${theme}.webp`;
     if (image.getAttribute('src') !== source) image.src = source;
 
     themeButtons.forEach((button) => {
@@ -150,10 +154,10 @@ function showPlatformDownload() {
   let label;
   if (/^win/i.test(platform) || /Windows NT/i.test(agent)) {
     target = 'card-windows';
-    label = 'Tải cho Windows';
+    label = IS_EN ? 'Download for Windows' : 'Tải cho Windows';
   } else if (/linux|^x11/i.test(platform) || /X11;.*Linux/i.test(agent)) {
     target = 'card-linux';
-    label = 'Tải cho Linux';
+    label = IS_EN ? 'Download for Linux' : 'Tải cho Linux';
   } else {
     return;
   }
@@ -171,7 +175,7 @@ const packagePatterns = {
   tar: /^tiarun-linux-x86_64\.tar\.gz$/,
 };
 
-const sizeFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
+const sizeFormat = new Intl.NumberFormat(IS_EN ? 'en-US' : 'vi-VN', { maximumFractionDigits: 1 });
 
 async function updateDownloads() {
   try {
