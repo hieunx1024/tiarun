@@ -30,7 +30,7 @@ pub struct ThemeConfig {
     pub highlight_color: String,
     #[serde(default = "default_true")]
     pub show_icons: Option<bool>,
-    #[serde(default = "default_false")]
+    #[serde(default = "default_true")]
     pub show_status_bar: Option<bool>,
     #[serde(default = "default_true")]
     pub compact_empty_view: Option<bool>,
@@ -44,7 +44,6 @@ fn default_selection_fg() -> String { "#faf9f5".to_string() }
 fn default_border_color() -> String { "#2d2d2d".to_string() }
 fn default_highlight_color() -> String { "#dedcd1".to_string() }
 fn default_true() -> Option<bool> { Some(true) }
-fn default_false() -> Option<bool> { Some(false) }
 
 impl ThemeConfig {
     pub fn is_dark(&self) -> bool {
@@ -221,7 +220,7 @@ impl Default for ThemeConfig {
             border_color: default_border_color(),
             highlight_color: default_highlight_color(),
             show_icons: Some(true),
-            show_status_bar: Some(false),
+            show_status_bar: Some(true),
             compact_empty_view: Some(true),
         }
     }
@@ -803,5 +802,23 @@ pub fn setup_global_shortcut() {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_show_status_bar_defaults_to_true() {
+        let default_theme = ThemeConfig::default();
+        assert_eq!(default_theme.show_status_bar, Some(true));
+
+        let parsed: Config = toml::from_str("").expect("empty TOML should parse with defaults");
+        assert_eq!(parsed.theme.show_status_bar, Some(true));
+
+        let parsed_explicit_false: Config =
+            toml::from_str("[theme]\nshow_status_bar = false\n").expect("explicit false should parse");
+        assert_eq!(parsed_explicit_false.theme.show_status_bar, Some(false));
     }
 }
