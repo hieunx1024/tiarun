@@ -572,6 +572,7 @@ fn test_smart_copy_item() {
 }
 
 #[test]
+#[cfg(not(windows))]
 fn test_resolve_window_icon_matches_wm_class_desktop_id_and_fallback() {
     let temp_dir = std::env::temp_dir().join(format!("tiarun_win_icon_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&temp_dir);
