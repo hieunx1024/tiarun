@@ -7,12 +7,12 @@
   --line: #303236;
   --text: #f2f3f4;
   --muted: #b3b7bf;
-  --accent: #a2c2ff;
-  --accent-hover: #214b9f;
-  --accent-fill: #2b5bbd;
-  --accent-ink: #ffffff;
-  --accent-bg: #232a39;
-  --focus: #a2c2ff;
+  --accent: #9fd4e4;
+  --accent-hover: #82e5ff;
+  --accent-fill: #60dafa;
+  --accent-ink: #0d1419;
+  --accent-bg: #1d3037;
+  --download-card-highlight: #3d5963;
   --font: "Be Vietnam Pro", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
   --gutter: clamp(1rem, 4.8vw, 4.5rem);
@@ -27,12 +27,12 @@
   --line: #d9dade;
   --text: #191a1d;
   --muted: #535964;
-  --accent: #214eaa;
-  --accent-hover: #1c449e;
-  --accent-fill: #214eaa;
+  --accent: #236577;
+  --accent-hover: #00536a;
+  --accent-fill: #00657d;
   --accent-ink: #ffffff;
-  --accent-bg: #e9effb;
-  --focus: #214eaa;
+  --accent-bg: #e6f3f6;
+  --download-card-highlight: #a1bbc3;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -66,7 +66,7 @@ kbd {
 }
 
 :focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
 
@@ -174,13 +174,13 @@ kbd {
 [data-theme="light"] .theme-moon { display: block; }
 .theme-toggle { border-color: transparent; }
 
-.primary {
+.primary, .package .button {
   border-color: transparent;
   background: var(--accent-fill);
   color: var(--accent-ink);
 }
 
-.primary:hover { border-color: transparent; background: var(--accent-hover); }
+.primary:hover, .package .button:hover { border-color: transparent; background: var(--accent-hover); }
 .secondary { background: var(--surface); }
 .text-link { color: var(--accent); text-underline-offset: 0.22em; }
 
@@ -462,20 +462,6 @@ kbd {
 .commands dt { color: var(--accent); font-size: 0.9rem; }
 .commands dd { color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
 
-.download-section {
-  --download-button-bg: #60dafa;
-  --download-button-hover: #82e5ff;
-  --download-button-text: #0d1419;
-  --download-card-highlight: #3d5963;
-}
-
-[data-theme="light"] .download-section {
-  --download-button-bg: #00657d;
-  --download-button-hover: #00536a;
-  --download-button-text: #ffffff;
-  --download-card-highlight: #a1bbc3;
-}
-
 .downloads-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -522,16 +508,7 @@ kbd {
 .package p { margin-top: 0.25rem; font-size: 0.875rem; line-height: 1.55; }
 .package a { justify-self: start; font-size: 0.875rem; }
 .package .text-link { padding-block: 0.65rem; }
-.package .button {
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  border-color: transparent;
-  background: var(--download-button-bg);
-  color: var(--download-button-text);
-}
-
-.package .button:hover { background: var(--download-button-hover); }
-.package .button:focus-visible { outline-color: var(--download-button-bg); }
+.package .button { flex-wrap: wrap; gap: 0.25rem; }
 .package small { margin-inline-start: 0.2rem; color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
 .package .button small { color: inherit; }
 .package .text-link small::before { content: "· "; }
