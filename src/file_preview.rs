@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn test_file_preview_text_and_metadata() {
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_preview_test_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_preview_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let _ = std::fs::create_dir_all(&temp_dir);
 
@@ -626,7 +626,7 @@ mod tests {
 
     #[test]
     fn test_directory_preview() {
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_dir_test_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_dir_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let _ = std::fs::create_dir_all(&temp_dir);
 
@@ -647,7 +647,7 @@ mod tests {
 
     #[test]
     fn test_long_line_truncation() {
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_trunc_test_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_trunc_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let _ = std::fs::create_dir_all(&temp_dir);
 
@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn test_large_image_protection() {
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_large_img_test_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_large_img_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let _ = std::fs::create_dir_all(&temp_dir);
 
@@ -698,11 +698,11 @@ mod tests {
     #[test]
     fn test_preview_cache_and_lru() {
         let cache = PreviewCache::new();
-        let preview1 = cache.get_or_create_preview("assets/view-launcher.png");
+        let preview1 = cache.get_or_create_preview("assets/tiarun.png");
         assert_eq!(preview1.preview_type, "image");
 
         // Second lookup hits cache
-        let preview2 = cache.get_or_create_preview("assets/view-launcher.png");
+        let preview2 = cache.get_or_create_preview("assets/tiarun.png");
         assert_eq!(preview2.title, preview1.title);
 
         // Thumbnail LRU cache
@@ -713,7 +713,7 @@ mod tests {
     #[test]
     fn test_decode_thumbnail_rgba() {
         // Test PNG
-        let res_png = decode_thumbnail_rgba("assets/view-launcher.png", 300, 200);
+        let res_png = decode_thumbnail_rgba("assets/tiarun.png", 300, 200);
         assert!(res_png.is_some());
         let (w, h, bytes) = res_png.unwrap();
         assert!(w <= 300);
@@ -721,7 +721,7 @@ mod tests {
         assert_eq!(bytes.len(), (w * h * 4) as usize);
 
         // Test SVG
-        let res_svg = decode_thumbnail_rgba("assets/view-launcher.svg", 300, 200);
+        let res_svg = decode_thumbnail_rgba("assets/tiarun.svg", 300, 200);
         assert!(res_svg.is_some());
         let (w, h, bytes) = res_svg.unwrap();
         assert!(w <= 300);

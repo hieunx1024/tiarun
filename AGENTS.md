@@ -61,7 +61,7 @@ On Windows, `main()` calls `warm_icon_cache_chunked()` ([src/main.rs](src/main.r
 
 - `launcher` — `LauncherEngine`: app/file indexing, fuzzy search & ranking (`fuzzy-matcher` SkimMatcherV2 + custom tiered scoring), launching items, Vietnamese accent-insensitive matching (`remove_vietnamese_accents`).
 - `icon_resolver` — native icon extraction/caching (`.desktop` icon themes on Linux, Shell icon extraction on Windows), plus SVG rasterization (`resvg`/`usvg`/`tiny-skia`) for bundled UI glyphs.
-- `config` — `Config` struct (serde + `toml`), loaded from/saved to `~/.config/tiarun/config.toml` (Linux) or `%APPDATA%\tiarun\config.toml` (Windows); also owns autostart registration and global-hotkey setup. Automatic migration from legacy `view-launcher` directory.
+- `config` — `Config` struct (serde + `toml`), loaded from/saved to `~/.config/tiarun/config.toml` (Linux) or `%APPDATA%\tiarun\config.toml` (Windows); also owns autostart registration and global-hotkey setup.
 - `calc` — inline expression parser/evaluator (arithmetic, hex/binary literals, unit & currency conversion).
 - `plugins` — Rofi-style external script plugin system, scripts loaded from `~/.config/tiarun/plugins/`.
 - `window_switcher` — enumerates and focuses open windows (platform-specific).

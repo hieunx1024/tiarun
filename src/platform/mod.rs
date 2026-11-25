@@ -50,6 +50,9 @@ pub(crate) fn apply_skip_taskbar(winit_window: &i_slint_backend_winit::winit::wi
 
 pub(crate) fn focus_launcher_window(ui: &AppWindow) {
     ui.window().with_winit_window(|w| {
+        w.set_title("TiaRun");
+        w.set_transparent(true);
+        w.set_decorations(false);
         apply_skip_taskbar(w);
         #[cfg(target_os = "windows")]
         windows_wm::focus_windows_window(w);
@@ -172,7 +175,13 @@ pub(crate) fn show_and_focus_launcher(
         *lock = Instant::now();
     }
     if !was_visible {
-        animate_window_pop_in(ui_weak.clone());
+        if is_gnome_desktop() {
+            // GNOME Mutter already animates window map/unmap; starting at opacity 0
+            // on first Wayland surface map can leave the initial buffer transparent.
+            ui.set_is_pop_visible(true);
+        } else {
+            animate_window_pop_in(ui_weak.clone());
+        }
     }
     let _ = show_launcher_window(ui);
     focus_launcher_window(ui);
@@ -185,12 +194,26 @@ pub(crate) fn show_and_focus_launcher(
         slint::Timer::single_shot(Duration::from_millis(30), move || {
             if let Some(ui) = ui_weak.upgrade().filter(|ui| ui.window().is_visible()) {
                 reposition_and_anchor_window(&ui);
+                focus_launcher_window(&ui);
+                ui.set_is_pop_visible(true);
+                ui.window().request_redraw();
                 ui.invoke_focus_search();
                 if !initial_query_owned.is_empty() && ui.get_search_text().as_str() == initial_query_owned {
                     ui.invoke_move_cursor_to_end();
                 }
             }
         });
+        if is_gnome_desktop() {
+            let ui_weak_gnome = ui.as_weak();
+            slint::Timer::single_shot(Duration::from_millis(120), move || {
+                if let Some(ui) = ui_weak_gnome.upgrade().filter(|ui| ui.window().is_visible()) {
+                    let _ = show_launcher_window(&ui);
+                    focus_launcher_window(&ui);
+                    ui.window().request_redraw();
+                    ui.invoke_focus_search();
+                }
+            });
+        }
     }
 }
 
@@ -209,7 +232,35 @@ pub(crate) fn show_and_focus_launcher(
 pub(crate) fn init_platform_with_app_id(app_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let backend_config = std::env::var("SLINT_BACKEND").unwrap_or_default().to_lowercase();
     let renderer_name = backend_config.split_once('-').map(|(_, renderer)| renderer).filter(|r| !r.is_empty());
-    let backend = i_slint_backend_winit::Backend::new_with_renderer_by_name(renderer_name)?;
+
+    let mut builder = i_slint_backend_winit::Backend::builder()
+        .with_window_attributes_hook(|attrs| {
+            attrs
+                .with_title("TiaRun")
+                .with_transparent(true)
+                .with_decorations(false)
+        });
+    if let Some(name) = renderer_name {
+        builder = builder.with_renderer_name(name);
+    }
+
+    // On GNOME Wayland, native Wayland xdg_toplevel windows have no protocol to
+    // skip the dock/taskbar or self-center. Using XWayland when DISPLAY is
+    // available preserves WAYLAND_DISPLAY for clipboard/extensions while letting
+    // Mutter honor _NET_WM_STATE_SKIP_TASKBAR, ABOVE, and exact centering.
+    #[cfg(all(target_os = "linux", feature = "x11"))]
+    if is_gnome_desktop()
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("SLINT_BACKEND").is_none()
+    {
+        use i_slint_backend_winit::winit::platform::x11::EventLoopBuilderExtX11;
+        let mut el_builder = i_slint_backend_winit::winit::event_loop::EventLoop::with_user_event();
+        el_builder.with_any_thread(true);
+        el_builder.with_x11();
+        builder = builder.with_event_loop_builder(el_builder);
+    }
+
+    let backend = builder.build()?;
     slint::platform::set_platform(Box::new(backend))
         .map_err(|e| format!("failed to set slint platform: {e}"))?;
     slint::set_xdg_app_id(app_id)?;

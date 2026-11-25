@@ -262,11 +262,14 @@ pub(crate) fn render_search_results(
             ui.set_empty_state_subtitle("Press Backspace to go back to parent folder".into());
             ui.set_is_empty_folder(true);
         } else if is_win_mode {
-            let is_gnome_wl = std::env::var_os("WAYLAND_DISPLAY").is_some()
-                && crate::platform::is_gnome_desktop();
+            let is_gnome_wl_blocked = std::env::var_os("WAYLAND_DISPLAY").is_some()
+                && crate::platform::is_gnome_desktop()
+                && !tiarun::window_switcher::is_gnome_wayland_listing_active();
             ui.set_empty_state_title("No matching windows found".into());
-            ui.set_empty_state_subtitle(if is_gnome_wl {
-                "GNOME Wayland blocks window listing unless 'Window Calls' extension is enabled"
+            ui.set_empty_state_subtitle(if is_gnome_wl_blocked {
+                "Log out and back in to activate TiaRun's GNOME Shell extension (or enable 'Window Calls')"
+            } else if has_mode_content {
+                "Try a different window title or app name"
             } else {
                 "Make sure target application window is running"
             }.into());

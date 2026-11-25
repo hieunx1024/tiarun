@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_file_watcher_create_and_remove() {
-        let temp_dir = std::env::temp_dir().join(format!("view_launcher_watch_test_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("tiarun_watch_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let _ = std::fs::create_dir_all(&temp_dir);
 

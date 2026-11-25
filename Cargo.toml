@@ -1,6 +1,6 @@
 [package]
 name = "tiarun"
-version = "1.2.1"
+version = "1.2.3"
 edition = "2024"
 authors = ["Hieu Nguyen <work.hieunguyen@gmail.com>"]
 description = "A minimalist, high-performance desktop app & file launcher in Rust (<5ms)"

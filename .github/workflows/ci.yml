@@ -34,13 +34,15 @@ jobs:
       - name: Build Debian package
         run: |
           VERSION=$(grep -m1 '^version =' Cargo.toml | cut -d '"' -f2)
-          mkdir -p target/deb-pkg/usr/bin target/deb-pkg/usr/share/applications target/deb-pkg/usr/share/pixmaps target/deb-pkg/usr/share/icons/hicolor/scalable/apps target/deb-pkg/DEBIAN
+          mkdir -p target/deb-pkg/usr/bin target/deb-pkg/usr/share/applications target/deb-pkg/usr/share/pixmaps target/deb-pkg/usr/share/icons/hicolor/scalable/apps target/deb-pkg/usr/share/icons/hicolor/128x128/apps target/deb-pkg/usr/share/icons/hicolor/256x256/apps target/deb-pkg/DEBIAN
           cp target/release/tiarun target/deb-pkg/usr/bin/
           chmod 755 target/deb-pkg/usr/bin/tiarun
           cp assets/tiarun.desktop target/deb-pkg/usr/share/applications/
           cp assets/tiarun.png target/deb-pkg/usr/share/pixmaps/
           cp assets/tiarun.svg target/deb-pkg/usr/share/pixmaps/
           cp assets/tiarun.svg target/deb-pkg/usr/share/icons/hicolor/scalable/apps/
+          cp assets/tiarun_128.png target/deb-pkg/usr/share/icons/hicolor/128x128/apps/tiarun.png
+          cp assets/tiarun_256.png target/deb-pkg/usr/share/icons/hicolor/256x256/apps/tiarun.png
           mkdir -p target/shlibs-tmp/debian
           printf 'Source: tiarun\n\nPackage: tiarun\nArchitecture: amd64\n' > target/shlibs-tmp/debian/control
           SHLIBS_DEPS=$(cd target/shlibs-tmp && dpkg-shlibdeps -O ../../target/release/tiarun | sed 's/^shlibs:Depends=//')

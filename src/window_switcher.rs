@@ -28,6 +28,22 @@ pub struct ProcessStats {
 
 static CPU_SAMPLE_CACHE: OnceLock<Mutex<HashMap<u32, (u64, Instant)>>> = OnceLock::new();
 static PROCESS_STATS_CACHE: OnceLock<Mutex<HashMap<u32, (ProcessStats, Instant)>>> = OnceLock::new();
+#[cfg(target_os = "linux")]
+static GNOME_WAYLAND_LISTING_ACTIVE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Returns whether the last GNOME Wayland window query succeeded via TiaRun's
+/// Shell Integration or the Window Calls D-Bus extension.
+pub fn is_gnome_wayland_listing_active() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        GNOME_WAYLAND_LISTING_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
 
 fn cpu_sample_cache() -> &'static Mutex<HashMap<u32, (u64, Instant)>> {
     CPU_SAMPLE_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
@@ -123,13 +139,18 @@ fn enumerate_open_windows() -> Vec<WindowItem> {
         }
     }
 
-    // 2.5 Try GNOME Wayland ("Window Calls" extension over D-Bus) if present
+    // 2.5 Try GNOME Wayland (embedded TiaRun extension first, "Window Calls" fallback)
     #[cfg(target_os = "linux")]
     if is_gnome_wayland() {
-        let gnome_windows = enumerate_gnome_window_calls(self_pid);
-        if !gnome_windows.is_empty() {
+        if let Some(gnome_windows) = enumerate_tiarun_gnome_ext(self_pid) {
+            GNOME_WAYLAND_LISTING_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
             return gnome_windows;
         }
+        if let Some(window_calls) = enumerate_gnome_window_calls(self_pid) {
+            GNOME_WAYLAND_LISTING_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+            return window_calls;
+        }
+        GNOME_WAYLAND_LISTING_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
     }
 
     // 2.6 Try KDE Plasma Wayland via kdotool if present
@@ -258,7 +279,7 @@ fn enumerate_open_windows() -> Vec<WindowItem> {
                         let title = String::from_utf16_lossy(&title_buf[..read_len as usize])
                             .trim()
                             .to_string();
-                        if !title.is_empty() && title != "View Launcher" && title != "TiaRun" {
+                        if !title.is_empty() && title != "TiaRun" {
                             let mut pid: u32 = 0;
                             GetWindowThreadProcessId(hwnd, &mut pid);
                             if pid > 0 {
@@ -905,20 +926,51 @@ fn is_kde_wayland() -> bool {
 }
 
 #[cfg(any(target_os = "linux", test))]
-fn parse_gnome_window_calls_output(raw: &str, self_pid: u32) -> Vec<WindowItem> {
+fn unescape_gvariant_string(raw: &str) -> String {
     let trimmed = raw.trim();
-    // `gdbus` prints GVariant tuple: `('[...]',)`
-    let json_slice = trimmed
+    let inner = trimmed
         .strip_prefix("('")
         .and_then(|s| s.strip_suffix("',)"))
-        .map(|s| s.replace("\\'", "'"))
-        .unwrap_or_else(|| trimmed.to_string());
-    let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_slice) else {
-        return Vec::new();
+        .or_else(|| trimmed.strip_prefix("(\"").and_then(|s| s.strip_suffix("\",)")));
+
+    let Some(inner) = inner else {
+        return trimmed.to_string();
     };
-    let Some(arr) = val.as_array() else {
-        return Vec::new();
-    };
+
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('\\') => out.push('\\'),
+                Some('\'') => out.push('\''),
+                Some('"') => out.push('"'),
+                Some('n') => out.push('\n'),
+                Some('r') => out.push('\r'),
+                Some('t') => out.push('\t'),
+                Some('b') => out.push('\x08'),
+                Some('f') => out.push('\x0c'),
+                Some('a') => out.push('\x07'),
+                Some('v') => out.push('\x0b'),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn parse_gnome_windows_json(raw: &str, self_pid: u32, id_prefix: &str) -> Option<Vec<WindowItem>> {
+    // `gdbus` prints GVariant tuple as `('...',)` or `("...",)` (when `'` is present).
+    let json_slice = unescape_gvariant_string(raw);
+    let val = serde_json::from_str::<serde_json::Value>(&json_slice).ok()?;
+    let arr = val.as_array()?;
     let mut out = Vec::new();
     for item in arr {
         let pid = item["pid"]
@@ -935,7 +987,7 @@ fn parse_gnome_window_calls_output(raw: &str, self_pid: u32) -> Vec<WindowItem> 
         let class_name = item["wm_class"].as_str().unwrap_or("").trim().to_string();
         if !title.is_empty() && !class_name.eq_ignore_ascii_case("tiarun") {
             out.push(WindowItem {
-                id: format!("gnome:{}", id),
+                id: format!("{}{}", id_prefix, id),
                 title,
                 class_name,
                 pid,
@@ -945,31 +997,47 @@ fn parse_gnome_window_calls_output(raw: &str, self_pid: u32) -> Vec<WindowItem> 
             });
         }
     }
-    out
+    Some(out)
+}
+
+#[cfg(test)]
+fn parse_gnome_window_calls_output(raw: &str, self_pid: u32) -> Vec<WindowItem> {
+    parse_gnome_windows_json(raw, self_pid, "gnome:").unwrap_or_default()
 }
 
 #[cfg(target_os = "linux")]
-fn enumerate_gnome_window_calls(self_pid: u32) -> Vec<WindowItem> {
-    let Ok(out) = Command::new("gdbus")
-        .args(&[
-            "call",
-            "--session",
-            "--dest",
-            "org.gnome.Shell",
-            "--object-path",
-            "/org/gnome/Shell/Extensions/Windows",
-            "--method",
-            "org.gnome.Shell.Extensions.Windows.List",
-        ])
+fn call_gnome_dbus_list(dest: &str, path: &str, method: &str, self_pid: u32, id_prefix: &str) -> Option<Vec<WindowItem>> {
+    let out = Command::new("gdbus")
+        .args(&["call", "--session", "--dest", dest, "--object-path", path, "--method", method])
         .output()
-    else {
-        return Vec::new();
-    };
+        .ok()?;
     if !out.status.success() {
-        return Vec::new();
+        return None;
     }
     let text = String::from_utf8_lossy(&out.stdout);
-    parse_gnome_window_calls_output(&text, self_pid)
+    parse_gnome_windows_json(&text, self_pid, id_prefix)
+}
+
+#[cfg(target_os = "linux")]
+fn enumerate_tiarun_gnome_ext(self_pid: u32) -> Option<Vec<WindowItem>> {
+    call_gnome_dbus_list(
+        "com.tiarun.ShellIntegration",
+        "/com/tiarun/ShellIntegration",
+        "com.tiarun.ShellIntegration.List",
+        self_pid,
+        "tiarun-gnome:",
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn enumerate_gnome_window_calls(self_pid: u32) -> Option<Vec<WindowItem>> {
+    call_gnome_dbus_list(
+        "org.gnome.Shell",
+        "/org/gnome/Shell/Extensions/Windows",
+        "org.gnome.Shell.Extensions.Windows.List",
+        self_pid,
+        "gnome:",
+    )
 }
 
 #[cfg(target_os = "linux")]
@@ -1252,6 +1320,23 @@ pub fn focus_window(id: &str) {
         return;
     }
 
+    if let Some(gnome_id) = id.strip_prefix("tiarun-gnome:") {
+        let _ = Command::new("gdbus")
+            .args(&[
+                "call",
+                "--session",
+                "--dest",
+                "com.tiarun.ShellIntegration",
+                "--object-path",
+                "/com/tiarun/ShellIntegration",
+                "--method",
+                "com.tiarun.ShellIntegration.Activate",
+                gnome_id,
+            ])
+            .spawn();
+        return;
+    }
+
     if let Some(gnome_id) = id.strip_prefix("gnome:") {
         let _ = Command::new("gdbus")
             .args(&[
@@ -1401,6 +1486,28 @@ Private_Dirty:       288 kB
         assert_eq!(wins[0].title, "Firefox");
         assert_eq!(wins[0].class_name, "firefox");
         assert_eq!(wins[0].pid, Some(4242));
+
+        // Double-quoted GVariant tuple emitted by `gdbus` when title contains `'`.
+        let single_quote_raw = r#"("[{\"id\": 1, \"title\": \"O'Reilly\", \"wm_class\": \"app\", \"pid\": 10}]",)"#;
+        let single_wins = parse_gnome_windows_json(single_quote_raw, 9999, "tiarun-gnome:").unwrap();
+        assert_eq!(single_wins.len(), 1);
+        assert_eq!(single_wins[0].id, "tiarun-gnome:1");
+        assert_eq!(single_wins[0].title, "O'Reilly");
+
+        // Mixed quotes, backslashes, and escaped newline/tab from GLib GVariant formatting.
+        let mixed_raw = r#"("[{\"id\": 2, \"title\": \"Both 'single' and \\\"double\\\"\", \"wm_class\": \"code\", \"pid\": 11}]",)"#;
+        let mixed_wins = parse_gnome_windows_json(mixed_raw, 9999, "tiarun-gnome:").unwrap();
+        assert_eq!(mixed_wins.len(), 1);
+        assert_eq!(mixed_wins[0].title, "Both 'single' and \"double\"");
+
+        let slash_raw = r#"('[{"id": 3, "title": "Line1\\nLine2\\tTab\\\\Slash", "wm_class": "term", "pid": 12}]',)"#;
+        let slash_wins = parse_gnome_windows_json(slash_raw, 9999, "tiarun-gnome:").unwrap();
+        assert_eq!(slash_wins.len(), 1);
+        assert_eq!(slash_wins[0].title, "Line1\nLine2\tTab\\Slash");
+
+        // Valid empty array means extension answered with 0 open windows (`Some(vec![])`).
+        assert!(parse_gnome_windows_json("('[]',)", 9999, "tiarun-gnome:").is_some_and(|v| v.is_empty()));
+        assert!(parse_gnome_windows_json("invalid", 9999, "tiarun-gnome:").is_none());
 
         assert_eq!(parse_wm_class_bytes(b"Navigator\0firefox\0"), "firefox");
         assert_eq!(parse_wm_class_bytes(b"alacritty\0"), "alacritty");

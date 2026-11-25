@@ -309,9 +309,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    // Setup global shortcut and currency rate cache in background (non-blocking)
+    // Setup global shortcut, GNOME shell integration, and currency rate cache in background (non-blocking)
     std::thread::spawn(|| {
         tiarun::config::setup_global_shortcut();
+        tiarun::gnome_ext::ensure_installed();
     });
     tiarun::calc::init_currency_rates();
 
@@ -356,7 +357,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    if !is_daemon {
+    if is_daemon {
+        resize_window_for_state(&ui);
+        #[cfg(all(unix, not(target_os = "macos")))]
+        if ui.window().with_winit_window(|w| w.is_visible().is_none()).unwrap_or(false) {
+            // Slint's winit Wayland backend creates an xdg_toplevel eagerly during
+            // AppWindow::new() and event_loop::resumed(), while ui.hide() is a no-op if
+            // shown==false. Cycling show()+hide() once after resumed() triggers Slint's
+            // Wayland suspend() so no empty ghost window stays in the dock while idle.
+            let ui_weak_init = ui.as_weak();
+            slint::Timer::single_shot(Duration::from_millis(0), move || {
+                if let Some(ui) = ui_weak_init.upgrade().filter(|ui| !ui.window().is_visible()) {
+                    let _ = show_launcher_window(&ui);
+                    hide_launcher_window(&ui);
+                }
+            });
+        }
+    } else {
         reposition_and_anchor_window(&ui);
     }
     configure_windows_borderless_transparent(&ui);
@@ -688,6 +705,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::thread::spawn(move || {
                         clip.refresh_now();
                     });
+                    if let Some(ui) = ui_weak.upgrade() {
+                        if ui.window().is_visible() && !ui.get_in_settings_mode() {
+                            let ui_w = ui.as_weak();
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(ui) = ui_w.upgrade().filter(|u| u.window().is_visible() && !u.get_in_settings_mode()) {
+                                    ui.invoke_focus_search();
+                                }
+                            });
+                        }
+                    }
                 }
                 WindowEvent::KeyboardInput { event, is_synthetic: false, .. } => {
                     let pressed = event.state == ElementState::Pressed;
@@ -724,9 +751,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             CopyPath,
                             CopyItem,
                             KillProcess,
+                            TabNext,
+                            TabPrev,
                         }
 
-                        let action = if ctrl && !mods.shift_key() && key_matches_char(event, ",") {
+                        let action = if !mods.control_key()
+                            && !mods.alt_key()
+                            && !mods.super_key()
+                            && matches!(event.logical_key, Key::Named(NamedKey::Tab))
+                        {
+                            Some(if mods.shift_key() {
+                                ShortcutAction::TabPrev
+                            } else {
+                                ShortcutAction::TabNext
+                            })
+                        } else if ctrl && !mods.shift_key() && key_matches_char(event, ",") {
                             Some(ShortcutAction::OpenConfig)
                         } else if alt && !mods.shift_key() && key_matches_char(event, "t") {
                             Some(ShortcutAction::OpenInTerminal)
@@ -761,6 +800,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         ShortcutAction::CopyPath => ui.invoke_copy_path(idx),
                                         ShortcutAction::CopyItem => ui.invoke_copy_item(idx),
                                         ShortcutAction::KillProcess => ui.invoke_kill_process(idx),
+                                        ShortcutAction::TabNext => ui.invoke_tab_pressed(),
+                                        ShortcutAction::TabPrev => ui.invoke_backtab_pressed(),
                                     }
                                 }
                             });
@@ -779,14 +820,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_weak = ui.as_weak();
         ui.on_open_config(move || {
             let start = Instant::now();
-            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_open_config ENTER at {:?}", start);
             }
             if let Some(ui) = ui_weak.upgrade() {
                 let cfg = Config::load();
                 apply_settings_to_ui(&ui, &cfg);
             }
-            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_open_config EXIT in {:?}", start.elapsed());
             }
         });
@@ -797,7 +838,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_weak = ui.as_weak();
         ui.on_close_settings(move || {
             let start = Instant::now();
-            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_close_settings ENTER at {:?}", start);
             }
             if let Some(ui) = ui_weak.upgrade() {
@@ -805,7 +846,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 resize_window_for_state(&ui);
                 ui.invoke_focus_search();
             }
-            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("VIEW_LAUNCHER_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
+            if std::env::var("TIARUN_DEBUG").is_ok() || std::env::var("RUST_LOG").is_ok() {
                 eprintln!("[DEBUG] on_close_settings EXIT in {:?}", start.elapsed());
             }
         });

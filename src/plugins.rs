@@ -18,10 +18,6 @@ pub fn get_plugins_dir() -> PathBuf {
     {
         if let Some(p) = dirs::config_dir() {
             let tiarun_plugins = p.join("tiarun").join("plugins");
-            let legacy_plugins = p.join("view-launcher").join("plugins");
-            if !tiarun_plugins.exists() && legacy_plugins.exists() {
-                let _ = fs::rename(&legacy_plugins, &tiarun_plugins);
-            }
             let _ = fs::create_dir_all(&tiarun_plugins);
             return tiarun_plugins;
         }
@@ -32,10 +28,6 @@ pub fn get_plugins_dir() -> PathBuf {
     {
         if let Some(p) = dirs::config_dir() {
             let tiarun_plugins = p.join("tiarun").join("plugins");
-            let legacy_plugins = p.join("view-launcher").join("plugins");
-            if !tiarun_plugins.exists() && legacy_plugins.exists() {
-                let _ = fs::rename(&legacy_plugins, &tiarun_plugins);
-            }
             let _ = fs::create_dir_all(&tiarun_plugins);
             return tiarun_plugins;
         }

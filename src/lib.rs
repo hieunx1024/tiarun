@@ -14,3 +14,4 @@ pub mod system_actions;
 pub mod plugins;
 pub mod file_watcher;
 pub mod file_preview;
+pub mod gnome_ext;

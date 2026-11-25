@@ -1,6 +1,6 @@
 ; Inno Setup Script for TiaRun
 #define MyAppName "TiaRun"
-#define MyAppVersion "1.2.1"
+#define MyAppVersion "1.2.3"
 #define MyAppPublisher "Hieu Nguyen"
 #define MyAppURL "https://tiarun.vercel.app"
 #define MyAppExeName "tiarun.exe"
@@ -65,7 +65,6 @@ var
   ResultCode: Integer;
 begin
   Exec('taskkill.exe', '/F /IM tiarun.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM view-launcher.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Sleep(250);
   Result := True;
 end;
@@ -75,7 +74,6 @@ var
   ResultCode: Integer;
 begin
   Exec('taskkill.exe', '/F /IM tiarun.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM view-launcher.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Sleep(250);
   Result := True;
 end;

@@ -312,18 +312,14 @@ mod tests {
 
         // 3. Workspace asset icon resolution
         let asset_svg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("tiarun.svg");
-        let asset_svg_fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("view-launcher.svg");
-        let target_svg = if asset_svg.exists() { asset_svg } else { asset_svg_fallback };
-        if target_svg.exists() {
-            let svg_icon = resolver.resolve_icon(target_svg.to_str(), "TiaRun", "tiarun");
+        if asset_svg.exists() {
+            let svg_icon = resolver.resolve_icon(asset_svg.to_str(), "TiaRun", "tiarun");
             assert!(svg_icon.is_some(), "Asset SVG should resolve when file exists");
         }
 
         let asset_png = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("tiarun.png");
-        let asset_png_fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join("view-launcher.png");
-        let target_png = if asset_png.exists() { asset_png } else { asset_png_fallback };
-        if target_png.exists() {
-            let png_icon = resolver.resolve_icon(target_png.to_str(), "TiaRun", "tiarun");
+        if asset_png.exists() {
+            let png_icon = resolver.resolve_icon(asset_png.to_str(), "TiaRun", "tiarun");
             assert!(png_icon.is_some(), "Asset PNG should resolve when file exists");
         }
 

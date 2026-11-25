@@ -1,0 +1,7 @@
+{
+  "uuid": "tiarun-shell@tiarun.app",
+  "name": "TiaRun Shell Integration",
+  "description": "Window listing and activation support for TiaRun on GNOME Wayland",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
+  "version": 1
+}

@@ -542,14 +542,7 @@ pub fn evaluate_conversion(query: &str) -> Option<ConversionResult> {
 static DYNAMIC_RATES: RwLock<Option<HashMap<String, f64>>> = RwLock::new(None);
 
 fn get_rates_cache_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|p| {
-        let tiarun_dir = p.join("tiarun");
-        let legacy_dir = p.join("view-launcher");
-        if !tiarun_dir.exists() && legacy_dir.exists() {
-            let _ = std::fs::rename(&legacy_dir, &tiarun_dir);
-        }
-        tiarun_dir.join("rates.json")
-    })
+    dirs::config_dir().map(|p| p.join("tiarun").join("rates.json"))
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

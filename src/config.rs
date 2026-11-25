@@ -333,12 +333,7 @@ pub struct Config {
 impl Config {
     pub fn get_config_path() -> PathBuf {
         if let Some(config_path) = dirs::config_dir() {
-            let tiarun_dir = config_path.join("tiarun");
-            let legacy_dir = config_path.join("view-launcher");
-            if !tiarun_dir.exists() && legacy_dir.exists() {
-                let _ = fs::rename(&legacy_dir, &tiarun_dir);
-            }
-            tiarun_dir.join("config.toml")
+            config_path.join("tiarun").join("config.toml")
         } else {
             PathBuf::from("config.toml")
         }
@@ -394,9 +389,7 @@ pub fn is_autostart_enabled() -> bool {
         // 1. Standard XDG autostart desktop entry
         if let Some(mut path) = dirs::config_dir() {
             path.push("autostart");
-            let tiarun_entry = path.join("tiarun.desktop");
-            let legacy_entry = path.join("view-launcher.desktop");
-            if tiarun_entry.exists() || legacy_entry.exists() {
+            if path.join("tiarun.desktop").exists() {
                 return true;
             }
         }
@@ -409,7 +402,7 @@ pub fn is_autostart_enabled() -> bool {
                         if c.lines().any(|line| {
                             let l = line.trim();
                             (l.starts_with("exec ") || l.starts_with("exec_always "))
-                                && (l.contains("tiarun") || l.contains("view-launcher"))
+                                && l.contains("tiarun")
                                 && l.contains("--daemon")
                         }) {
                             return true;
@@ -427,7 +420,7 @@ pub fn is_autostart_enabled() -> bool {
                     if c.lines().any(|line| {
                         let l = line.trim();
                         (l.starts_with("exec-once") || l.starts_with("exec =") || l.starts_with("exec="))
-                            && (l.contains("tiarun") || l.contains("view-launcher"))
+                            && l.contains("tiarun")
                             && l.contains("--daemon")
                     }) {
                         return true;
@@ -519,10 +512,6 @@ pub fn set_autostart(enabled: bool) -> Result<(), std::io::Error> {
                 if tiarun_entry.exists() {
                     let _ = fs::remove_file(&tiarun_entry);
                 }
-                let legacy_entry = path.join("view-launcher.desktop");
-                if legacy_entry.exists() {
-                    let _ = fs::remove_file(&legacy_entry);
-                }
             }
         }
 
@@ -545,7 +534,7 @@ pub fn set_autostart(enabled: bool) -> Result<(), std::io::Error> {
                         let has_daemon = content.lines().any(|l| {
                             let trimmed = l.trim();
                             (trimmed.starts_with("exec ") || trimmed.starts_with("exec_always "))
-                                && (trimmed.contains("tiarun") || trimmed.contains("view-launcher"))
+                                && trimmed.contains("tiarun")
                                 && trimmed.contains("--daemon")
                         });
 
@@ -561,7 +550,7 @@ pub fn set_autostart(enabled: bool) -> Result<(), std::io::Error> {
                                 .filter(|l| {
                                     let trimmed = l.trim();
                                     !((trimmed.starts_with("exec ") || trimmed.starts_with("exec_always "))
-                                        && (trimmed.contains("tiarun") || trimmed.contains("view-launcher"))
+                                        && trimmed.contains("tiarun")
                                         && trimmed.contains("--daemon"))
                                 })
                                 .collect();
@@ -588,7 +577,7 @@ pub fn set_autostart(enabled: bool) -> Result<(), std::io::Error> {
                     let has_daemon = content.lines().any(|l| {
                         let trimmed = l.trim();
                         trimmed.starts_with("exec-once")
-                            && (trimmed.contains("tiarun") || trimmed.contains("view-launcher"))
+                            && trimmed.contains("tiarun")
                             && trimmed.contains("--daemon")
                     });
 
@@ -604,7 +593,7 @@ pub fn set_autostart(enabled: bool) -> Result<(), std::io::Error> {
                             .filter(|l| {
                                 let trimmed = l.trim();
                                 !(trimmed.starts_with("exec-once")
-                                    && (trimmed.contains("tiarun") || trimmed.contains("view-launcher"))
+                                    && trimmed.contains("tiarun")
                                     && trimmed.contains("--daemon"))
                             })
                             .collect();
@@ -633,7 +622,6 @@ pub fn set_autostart(enabled: bool) -> Result<(), std::io::Error> {
             path.push("Programs");
             path.push("Startup");
             let _ = fs::remove_file(path.join("tiarun.bat"));
-            let _ = fs::remove_file(path.join("view-launcher.bat"));
         }
 
         let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Run\0"
@@ -720,7 +708,7 @@ pub fn setup_global_shortcut() {
             if let Ok(out) = output {
                 let current = String::from_utf8_lossy(&out.stdout);
                 let path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/tiarun/";
-                if !current.contains("tiarun") && !current.contains("view-launcher") {
+                if !current.contains("tiarun") {
                     let mut list: Vec<String> = current
                         .trim()
                         .trim_start_matches('@')
@@ -754,20 +742,9 @@ pub fn setup_global_shortcut() {
                 hypr_cfg.push("hyprland.conf");
                 if hypr_cfg.exists() {
                     if let Ok(content) = fs::read_to_string(&hypr_cfg) {
-                        let mut new_content = content.clone();
-                        let mut modified = false;
-                        if new_content.contains("bind = CTRL ALT, SPACE, exec, view-launcher")
-                            || new_content.contains("bind = CTRL ALT, space, exec, view-launcher")
-                        {
-                            new_content = new_content
-                                .replace("bind = CTRL ALT, SPACE, exec, view-launcher", "bind = CTRL ALT, space, exec, tiarun")
-                                .replace("bind = CTRL ALT, space, exec, view-launcher", "bind = CTRL ALT, space, exec, tiarun");
-                            modified = true;
-                        } else if !new_content.contains("exec, tiarun") && !new_content.contains("exec, view-launcher") {
+                        if !content.contains("exec, tiarun") {
+                            let mut new_content = content;
                             new_content.push_str("\nbind = CTRL ALT, space, exec, tiarun\n");
-                            modified = true;
-                        }
-                        if modified {
                             let _ = fs::write(&hypr_cfg, new_content);
                             let _ = std::process::Command::new("hyprctl").arg("reload").status();
                         }
@@ -782,7 +759,7 @@ pub fn setup_global_shortcut() {
                 for entry in walkdir::WalkDir::new(&sway_dir).max_depth(3).into_iter().flatten() {
                     if entry.file_type().is_file() {
                         if let Ok(c) = fs::read_to_string(entry.path()) {
-                            if c.contains("exec tiarun") || c.contains("exec view-launcher") {
+                            if c.contains("exec tiarun") {
                                 already_configured = true;
                                 break;
                             }

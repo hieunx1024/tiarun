@@ -22,8 +22,8 @@ optdepends=(
   'wl-clipboard: copy images and files to the Wayland clipboard'
   'kdotool: window switcher support on KDE Plasma Wayland'
 )
-provides=('tiarun' 'view-launcher')
-conflicts=('tiarun' 'view-launcher')
+provides=('tiarun')
+conflicts=('tiarun')
 source=("git+https://github.com/hieunx1024/tiarun.git")
 sha256sums=('SKIP')
 

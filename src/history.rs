@@ -61,25 +61,11 @@ impl HistoryManager {
     fn get_cache_path() -> Option<PathBuf> {
         #[cfg(target_os = "windows")]
         {
-            dirs::data_local_dir().map(|p| {
-                let tiarun_dir = p.join("tiarun");
-                let legacy_dir = p.join("view-launcher");
-                if !tiarun_dir.exists() && legacy_dir.exists() {
-                    let _ = std::fs::rename(&legacy_dir, &tiarun_dir);
-                }
-                tiarun_dir.join("history.toml")
-            })
+            dirs::data_local_dir().map(|p| p.join("tiarun").join("history.toml"))
         }
         #[cfg(not(target_os = "windows"))]
         {
-            dirs::cache_dir().map(|p| {
-                let tiarun_dir = p.join("tiarun");
-                let legacy_dir = p.join("view-launcher");
-                if !tiarun_dir.exists() && legacy_dir.exists() {
-                    let _ = std::fs::rename(&legacy_dir, &tiarun_dir);
-                }
-                tiarun_dir.join("history.toml")
-            })
+            dirs::cache_dir().map(|p| p.join("tiarun").join("history.toml"))
         }
     }
 

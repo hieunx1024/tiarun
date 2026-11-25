@@ -33,7 +33,7 @@ pub(crate) fn sway_ipc_query(socket: &str, request_type: u32) -> Option<serde_js
 fn check_node_focused(val: &serde_json::Value) -> bool {
     if val.get("focused").and_then(|v| v.as_bool()).unwrap_or(false) {
         if let Some(app_id) = val.get("app_id").and_then(|v| v.as_str()) {
-            return app_id == "tiarun" || app_id == "view-launcher";
+            return app_id == "tiarun";
         }
         return false;
     }
@@ -55,7 +55,7 @@ fn check_node_focused(val: &serde_json::Value) -> bool {
 }
 
 fn sway_launcher_node(node: &serde_json::Value) -> Option<&serde_json::Value> {
-    if node["app_id"].as_str() == Some("tiarun") || node["app_id"].as_str() == Some("view-launcher") {
+    if node["app_id"].as_str() == Some("tiarun") {
         return Some(node);
     }
     ["nodes", "floating_nodes"]
@@ -76,7 +76,7 @@ pub(crate) fn is_launcher_focused(ui: &AppWindow) -> bool {
                 let mut buf = [0u8; 1024];
                 if let Ok(n) = stream.read(&mut buf) {
                     if let Ok(s) = std::str::from_utf8(&buf[..n]) {
-                        return s.contains("\"class\": \"tiarun\"") || s.contains("\"class\": \"view-launcher\"");
+                        return s.contains("\"class\": \"tiarun\"");
                     }
                 }
             }
@@ -231,7 +231,7 @@ pub(crate) fn place_hyprland_launcher(ui: &AppWindow) -> Option<()> {
     let y = mon_y + mon_h * 15 / 100;
 
     send_hyprland_ipc_command(&format!(
-        "dispatch movewindowpixel exact {} {},title:^(TiaRun|View Launcher)$",
+        "dispatch movewindowpixel exact {} {},title:^(TiaRun)$",
         x, y
     ));
     Some(())
@@ -246,12 +246,12 @@ pub(crate) fn resize_hyprland_launcher(width: i32, _height: i32) -> Option<()> {
     let y = mon_y + mon_h * 15 / 100;
 
     send_hyprland_ipc_command(&format!(
-        "dispatch movewindowpixel exact {} {},title:^(TiaRun|View Launcher)$",
+        "dispatch movewindowpixel exact {} {},title:^(TiaRun)$",
         x, y
     ));
     slint::Timer::single_shot(Duration::from_millis(15), move || {
         send_hyprland_ipc_command(&format!(
-            "dispatch movewindowpixel exact {} {},title:^(TiaRun|View Launcher)$",
+            "dispatch movewindowpixel exact {} {},title:^(TiaRun)$",
             x, y
         ));
     });
@@ -337,7 +337,7 @@ pub(crate) fn start_hyprland_focus_watcher(ui_handle: slint::Weak<AppWindow>, sh
                     let Ok(line) = line else { break; };
                     if line.starts_with("activewindow>>") {
                         let active = line.trim_start_matches("activewindow>>");
-                        if !active.starts_with("tiarun,") && !active.starts_with("view-launcher,") {
+                        if !active.starts_with("tiarun,") {
                             let ui_weak = ui_handle.clone();
                             let shown = shown_instant.clone();
                             let _ = slint::invoke_from_event_loop(move || {

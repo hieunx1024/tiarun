@@ -42,9 +42,9 @@ fn calc_percentiles(mut latencies: Vec<Duration>) -> (Duration, Duration, Durati
 
 #[test]
 #[ignore = "stress benchmark - run with: cargo test --release --test stress_test -- --ignored --nocapture"]
-fn test_viewlauncher_comprehensive_stress_bench() {
+fn test_tiarun_comprehensive_stress_bench() {
     println!("\n================================================================================");
-    println!("             VIEW-LAUNCHER COMPREHENSIVE PERFORMANCE STRESS TEST                ");
+    println!("                TIARUN COMPREHENSIVE PERFORMANCE STRESS TEST                    ");
     println!("================================================================================\n");
 
     let initial_rss = get_rss_kb();
@@ -210,8 +210,8 @@ fn test_viewlauncher_comprehensive_stress_bench() {
     // -------------------------------------------------------------------------
     println!("\n[6/6] Benchmarking Live Daemon IPC Ping Roundtrip...");
     let socket_path = dirs::runtime_dir()
-        .map(|r| r.join("view-launcher.sock"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/view-launcher.sock"));
+        .map(|r| r.join("tiarun.sock"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/tiarun.sock"));
 
     if socket_path.exists() {
         let mut ipc_latencies = Vec::new();
