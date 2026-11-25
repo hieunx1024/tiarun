@@ -144,16 +144,19 @@ fn test_file_mode_search() {
 fn test_default_search_excludes_shallow_files() {
     let config = Config::default();
     let engine = LauncherEngine::new(config);
-    {
-        let mut lock = engine.shallow_files.write().unwrap();
-        lock.push(LauncherItem::new(
+    let hello_item = || {
+        LauncherItem::new(
             "hello.txt".to_string(),
             "/home/user/hello.txt".to_string(),
             ItemType::File,
             Some("Test File".to_string()),
             false,
             None,
-        ));
+        )
+    };
+    {
+        let mut lock = engine.shallow_files.write().unwrap();
+        lock.push(hello_item());
     }
 
     let default_results = engine.search("hello");
@@ -161,6 +164,15 @@ fn test_default_search_excludes_shallow_files() {
         !default_results.iter().any(|(item, _)| item.name == "hello.txt"),
         "Default app search must not mix in shallow files"
     );
+
+    // Background file indexing spawned by LauncherEngine::new() may finish and
+    // overwrite shallow_files between the two searches; ensure hello.txt is present.
+    {
+        let mut lock = engine.shallow_files.write().unwrap();
+        if !lock.iter().any(|item| item.name == "hello.txt") {
+            lock.push(hello_item());
+        }
+    }
 
     let file_results = engine.search("@f hello");
     assert!(
