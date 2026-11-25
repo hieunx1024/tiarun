@@ -160,3 +160,50 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+
+  sync-website:
+    name: Sync Website Version & Links
+    needs: [publish-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Resolve release tag
+        id: resolve_tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            VERSION=$(grep -m1 '^version =' Cargo.toml | cut -d '"' -f2)
+            TAG="v${VERSION}"
+          fi
+          echo "TAG=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Update website files
+        run: |
+          python3 .github/scripts/sync_website_release.py \
+            --tag "${{ steps.resolve_tag.outputs.TAG }}" \
+            --assets-dir release-assets
+
+      - name: Commit and push website sync
+        env:
+          TAG: ${{ steps.resolve_tag.outputs.TAG }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add website/index.html website/en/index.html website/sitemap.xml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(website): sync release ${TAG}"
+            git pull --rebase origin main
+            git push origin main
+          fi
