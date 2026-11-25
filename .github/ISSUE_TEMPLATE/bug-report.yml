@@ -1,0 +1,38 @@
+name: Báo lỗi / Bug report
+description: Báo lỗi khi cài hoặc dùng TiaRun. Report a problem installing or using TiaRun.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Phiên bản TiaRun / TiaRun version
+      description: Ghi phiên bản hoặc tên gói nếu lỗi xảy ra khi cài. Include the version or package name for install issues.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Hệ điều hành / Operating system
+      description: Ghi phiên bản hệ điều hành và môi trường desktop nếu dùng Linux. Include your OS version and, on Linux, your desktop environment.
+      placeholder: Windows 11, Ubuntu 24.04 + GNOME Wayland, …
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Các bước tái hiện / Steps to reproduce
+      description: Ghi thao tác, phím tắt hoặc nội dung đã nhập. Include the actions, shortcuts, or search text you used.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Kết quả thực tế và mong đợi / Actual and expected behavior
+      description: Điều gì đã xảy ra và bạn mong đợi điều gì? What happened, and what did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Ảnh chụp hoặc log / Screenshots or logs
+    validations:
+      required: false

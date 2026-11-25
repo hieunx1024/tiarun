@@ -1,0 +1,17 @@
+name: Góp ý / Feedback
+description: Góp ý về cách TiaRun hoạt động hoặc đề xuất tính năng. Share feedback or suggest a feature.
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Bạn muốn làm gì? / What are you trying to do?
+      description: Mô tả thao tác và chỗ bạn gặp vướng mắc. Describe the task and where you get stuck.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Thay đổi đề xuất / Suggested change
+      description: Mô tả cách bạn muốn TiaRun hoạt động. Describe how you would like TiaRun to work.
+    validations:
+      required: true
