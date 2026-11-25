@@ -581,7 +581,26 @@ dialog p { margin-block: 0.75rem; color: var(--muted); }
   background: var(--page);
 }
 
-.donate-bank img { border-radius: 0.35rem; }
+.donate-qr {
+  /* Show the QR panel within the original bank image. */
+  position: relative;
+  width: min(14rem, 100%);
+  aspect-ratio: 536 / 600;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: 0.35rem;
+}
+
+.donate-qr img {
+  position: absolute;
+  top: calc(-100% * 366 / 600);
+  left: calc(-100% * 97 / 536);
+  width: calc(100% * 730 / 536);
+  max-width: none;
+  height: auto;
+}
+
+.donate-bank dl { flex: 1 1 10rem; }
 .donate-bank dt { color: var(--muted); font-size: 0.875rem; }
 .donate-bank dd { margin-bottom: 0.35rem; font-weight: 700; }
 
