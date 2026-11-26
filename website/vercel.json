@@ -1,5 +1,17 @@
 {
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/en",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/en/",
+      "destination": "/",
+      "statusCode": 301
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

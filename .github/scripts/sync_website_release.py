@@ -119,7 +119,7 @@ def main() -> int:
     sizes = collect_asset_sizes(args.assets_dir, version)
 
     changed: list[Path] = []
-    for html_file in (args.website_dir / "index.html", args.website_dir / "en" / "index.html"):
+    for html_file in (args.website_dir / "index.html", args.website_dir / "vi" / "index.html"):
         if html_file.is_file() and sync_html(html_file, tag, version, sizes):
             changed.append(html_file)
 
